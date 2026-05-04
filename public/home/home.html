@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Eventify Full Prototype</title>
+  <link rel="stylesheet" href="/home/style.css">
+</head>
+
+<body>
+
+<header>
+  <h1>Eventify Prototype</h1>
+  <div>
+    <button id = "registerBtn" onclick="goRegister()">Register</button>
+    <button id="loginBtn" onclick="goLogin()">Login</button>
+    <button id="logout" onclick="logout()">Logout</button>
+  </div>
+</header>
+
+<strong><p id="userInfo"></p></strong>
+
+
+
+<div id="adminPanel" style="display:none;">
+  <h2>Admin Panel - Create Event</h2>
+
+  <input id="ename" placeholder="Event name"><br><br>
+  <input id="ecat" placeholder="Category"><br><br>
+  <input id="evenue" placeholder="Venue"><br><br>
+  <input id="eseats" type="number" placeholder="Seats"><br><br>
+  <input id="eprice" type="number" placeholder="Price"><br><br>
+
+  <button onclick="addEvent()">Create Event</button>
+</div>
+
+
+
+<h2>Events</h2>
+<div id="events"></div>
+
+<hr>
+
+<h2>My Bookings</h2>
+<div id="bookings"></div>
+
+<script src="/home/script.js"></script>
+
+</body>
+</html>
