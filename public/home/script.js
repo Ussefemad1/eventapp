@@ -1,3 +1,4 @@
+
 const userInfo    = document.getElementById("userInfo");
 const adminPanel  = document.getElementById("adminPanel");
 const eventsDiv   = document.getElementById("events");
@@ -6,10 +7,12 @@ const logoutBtn   = document.getElementById("logout");
 const registerBtn = document.getElementById("registerBtn");
 const loginBtn    = document.getElementById("loginBtn");
 
+// Session restore
 let currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
 
-const API = "/api";
+const API = "/api"; 
 
+// Fetch abstract
 async function apiFetch(path, options = {}) {
   const res = await fetch(API + path, {
     headers: { "Content-Type": "application/json" },
@@ -19,15 +22,18 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
+// Page redirect le ba2y el pages
 function goRegister() { window.location.href = "/register/register.html"; }
 function goLogin()    { window.location.href = "/login/login.html"; }
 
+// Clear session
 function logout() {
   sessionStorage.removeItem("currentUser");
   currentUser = null;
   updateUI();
 }
 
+// Create event
 async function addEvent() {
   const ename  = document.getElementById("ename");
   const ecat   = document.getElementById("ecat");
@@ -35,10 +41,12 @@ async function addEvent() {
   const eseats = document.getElementById("eseats");
   const eprice = document.getElementById("eprice");
 
+  // lazem kol el fields tbaa mawguda 
   if (!ename.value || !ecat.value || !evenue.value || !eseats.value || !eprice.value) {
     alert("Please fill all fields"); return;
   }
   try {
+    // publish event
     await apiFetch("/events", {
       method: "POST",
       body: JSON.stringify({
@@ -47,23 +55,25 @@ async function addEvent() {
         venue:     evenue.value,
         seats:     Number(eseats.value),
         price:     Number(eprice.value),
-        available: Number(eseats.value),
+        available: Number(eseats.value), 
       }),
     });
     alert("Event created!");
-    ename.value = ecat.value = evenue.value = eseats.value = eprice.value = "";
+    ename.value = ecat.value = evenue.value = eseats.value = eprice.value = ""; 
     renderEvents();
   } catch (e) { alert("Error: " + e.message); }
 }
 
+// book seat
 async function book(id) {
-  if (!currentUser) { alert("Login required!"); return; }
+  if (!currentUser) { alert("Login required!"); return; } // session check 
   try {
     const res = await fetch(`/api/events/${id}/book`, { method: "PUT" });
-    if (res.status === 409) { alert("Sold out"); return; }
+    if (res.status === 409) { alert("Sold out"); return; } // Capacity check
 
     const eventData = await res.json();
 
+    // Save booking
     await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -78,27 +88,29 @@ async function book(id) {
   } catch (e) { alert("Error: " + e.message); }
 }
 
+// Remove booking
 async function cancelBooking(eventId) {
   try {
     const bookings = await fetch("/api/bookings").then(r => r.json());
-    const booking = bookings.find(b => b.user === currentUser.email && b.eventId === eventId);
+    const booking = bookings.find(b => b.user === currentUser.email && b.eventId === eventId); // matched in database
     if (!booking) return;
 
-    await fetch(`/api/bookings/${booking._id}`, { method: "DELETE" });
-    await fetch(`/api/events/${eventId}/cancel`, { method: "PUT" });
+    await fetch(`/api/bookings/${booking._id}`, { method: "DELETE" }); 
+    await fetch(`/api/events/${eventId}/cancel`, { method: "PUT" });   
 
     renderEvents();
     renderBookings();
   } catch (e) { alert("Error: " + e.message); }
 }
 
+// Admin delete
 async function deleteEvent(id) {
   try {
     await apiFetch("/events/" + id, { method: "DELETE" });
 
     const bookings = await apiFetch("/bookings");
     for (const b of bookings.filter(b => b.eventId === id)) {
-      await apiFetch("/bookings/" + b._id, { method: "DELETE" });
+      await apiFetch("/bookings/" + b._id, { method: "DELETE" }); 
     }
 
     renderEvents();
@@ -106,6 +118,7 @@ async function deleteEvent(id) {
   } catch (e) { alert("Error: " + e.message); }
 }
 
+// List events
 async function renderEvents() {
   try {
     const events = await apiFetch("/events");
@@ -118,21 +131,22 @@ async function renderEvents() {
         <p>Price: ${e.price}</p>
         <p>Available: ${e.available}</p>`;
       if (!currentUser || currentUser.isAdmin !== true)
-        html += `<button onclick='book("${e._id}")'>Book</button>`;
+        html += `<button onclick='book("${e._id}")'>Book</button>`; // User action
       if (currentUser?.isAdmin === true)
-        html += `<button onclick='deleteEvent("${e._id}")'>Delete</button>`;
+        html += `<button onclick='deleteEvent("${e._id}")'>Delete</button>`; // Admin action (privilege check)
       html += `</div>`;
     }
     eventsDiv.innerHTML = html;
   } catch (e) { eventsDiv.innerHTML = "<p>Failed to load events</p>"; }
 }
 
+// User tickets
 async function renderBookings() {
-  if (!currentUser) { bookingsDiv.innerHTML = ""; return; }
+  if (!currentUser) { bookingsDiv.innerHTML = ""; return; } // lazem ykoon logged in 
   try {
     const bookings = await apiFetch("/bookings");
     let html = "";
-    for (const b of bookings.filter(b => b.user === currentUser.email)) {
+    for (const b of bookings.filter(b => b.user === currentUser.email)) { 
       html += `<div class='ticket'>
         <h3>${b.event}</h3>
         <p>🎟 Eventify Ticket</p>
@@ -143,14 +157,16 @@ async function renderBookings() {
   } catch (e) { bookingsDiv.innerHTML = ""; }
 }
 
+// Refresh UI
 function updateUI() {
   if (currentUser) {
     userInfo.innerHTML = "Welcome, " + currentUser.name;
     registerBtn.style.display = "none";
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
-    adminPanel.style.display = currentUser.isAdmin === true ? "block" : "none";
+    adminPanel.style.display = currentUser.isAdmin === true ? "block" : "none"; // bat2akd mn el role
   } else {
+    // Guest 
     userInfo.innerHTML = "";
     logoutBtn.style.display = "none";
     adminPanel.style.display = "none";
@@ -161,4 +177,4 @@ function updateUI() {
   renderBookings();
 }
 
-updateUI();
+updateUI(); 
