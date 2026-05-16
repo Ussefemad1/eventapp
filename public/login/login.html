@@ -1,22 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Login</title>
-  <link rel="stylesheet" href="/login/style.css">
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — Eventify</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/login/loginstyle.css"/>
 </head>
-
-
 <body>
 
-<h1 style="color: white;">Login</h1>
+<div class="auth-layout">
 
-<div class="fields">
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
+  <!-- Left Panel -->
+  <div class="auth-left d-none d-lg-flex">
+    <div class="auth-left-inner">
+      <a href="../home/home.html" class="ev-brand">
+        <span class="brand-dot"></span>Eventify
+      </a>
+      <div class="auth-tagline">
+        <h2>Discover & book<br/>unforgettable events.</h2>
+        <p>Thousands of experiences waiting for you.</p>
+      </div>
+      <div class="auth-decor-circles">
+        <div class="dc dc1"></div>
+        <div class="dc dc2"></div>
+        <div class="dc dc3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="auth-right">
+    <div class="auth-form-wrap">
+
+      <a href="../home/home.html" class="ev-brand d-lg-none mb-5 d-inline-flex">
+        <span class="brand-dot"></span>Eventify
+      </a>
+
+      <div class="auth-form-header">
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to your account to continue.</p>
+      </div>
+
+      <div id="errorMsg" class="auth-error" style="display:none;"></div>
+
+      <div class="mb-4">
+        <label class="auth-label">Email Address</label>
+        <input id="email" type="email" class="form-control auth-input" placeholder="you@example.com"/>
+      </div>
+
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="auth-label">Password</label>
+        </div>
+        <input id="password" type="password" class="form-control auth-input" placeholder="••••••••"/>
+      </div>
+
+      <button onclick="login()" class="btn auth-btn-primary w-100 mb-4">
+        Sign In
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-left:8px;vertical-align:-2px"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+      </button>
+
+      <p class="auth-switch">
+        Don't have an account?
+        <a href="../register/register.html" class="auth-link">Create one free</a>
+      </p>
+
+    </div>
+  </div>
+
 </div>
 
-<button onclick="login()">Login</button>
-<script src="/login/script.js"></script>
-
+<script src="/login/loginscript.js"></script>
 </body>
 </html>
