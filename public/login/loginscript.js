@@ -12,29 +12,42 @@ async function login() {
   }
 
   const btn = document.querySelector(".auth-btn-primary");
-  if (btn) { btn.disabled = true; btn.textContent = "Signing in…"; }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+  }
 
   try {
+
     const res = await fetch("/api/users/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({ email, password }),
     });
 
+    const data = await res.json();
+
     if (!res.ok) {
-      errorMsg.textContent = "Invalid email or password. Please try again.";
+      errorMsg.textContent = data.message || "Invalid login";
       errorMsg.style.display = "block";
       return;
     }
 
-    const user = await res.json();
-    sessionStorage.setItem("currentUser", JSON.stringify(user));
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("currentUser", JSON.stringify(data.user));
+
     window.location.href = "/home/home.html";
 
   } catch (e) {
+
     errorMsg.textContent = "Login failed: " + e.message;
     errorMsg.style.display = "block";
+
   } finally {
+
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = `Sign In <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-left:8px;vertical-align:-2px"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
@@ -43,5 +56,7 @@ async function login() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Enter") login();
+  });
 });

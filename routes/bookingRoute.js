@@ -1,39 +1,89 @@
 const express = require("express");
 const router  = express.Router();
-const Booking = require("../models/booking"); 
+const Booking = require("../models/booking");
+const auth    = require("../middleware/auth");
 
-// fetch bookings kulha 
-router.get("/", async (req, res) => {
-  const bookings = await Booking.find();
+// fetch bookings
+router.get("/", auth, async (req, res) => {
+
+  const bookings = await Booking.find({
+    user: req.user.email
+  });
+
   res.json(bookings);
 });
 
-// fetch booking bel id 
-router.get("/:id", async (req, res) => {
+// fetch booking by id
+router.get("/:id", auth, async (req, res) => {
+
   const booking = await Booking.findById(req.params.id);
+
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found" });
+  }
+
+  if (booking.user !== req.user.email) {
+    return res.status(403).json({ message: "Unauthorized" });
+  }
+
   res.json(booking);
 });
 
-// booking gdeda 
-router.post("/", async (req, res) => {
+// create booking
+router.post("/", auth, async (req, res) => {
   try {
-    const booking = new Booking(req.body);
-    await booking.save(); // Persist
+
+    const booking = new Booking({
+      ...req.body,
+      user: req.user.email
+    });
+
+    await booking.save();
+
     res.status(201).json(booking);
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Edit booking fel database 
-router.put("/:id", async (req, res) => {
-  const booking = await Booking.findByIdAndUpdate(req.params.id, req.body, { returnDocument: "after" });
-  res.json(booking);
+// edit booking
+router.put("/:id", auth, async (req, res) => {
+
+  const booking = await Booking.findById(req.params.id);
+
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found" });
+  }
+
+  if (booking.user !== req.user.email) {
+    return res.status(403).json({ message: "Unauthorized" });
+  }
+
+  const updated = await Booking.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { returnDocument: "after" }
+  );
+
+  res.json(updated);
 });
 
-// Remove booking mn el database 
-router.delete("/:id", async (req, res) => {
+// delete booking
+router.delete("/:id", auth, async (req, res) => {
+
+  const booking = await Booking.findById(req.params.id);
+
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found" });
+  }
+
+  if (booking.user !== req.user.email) {
+    return res.status(403).json({ message: "Unauthorized" });
+  }
+
   await Booking.findByIdAndDelete(req.params.id);
+
   res.json({ message: "Booking deleted" });
 });
 

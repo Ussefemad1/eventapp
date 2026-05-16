@@ -1,60 +1,92 @@
 const express = require("express");
 const router  = express.Router();
-const Event   = require("../models/event"); 
+const Event   = require("../models/event");
+const auth    = require("../middleware/auth");
 
-// fetch events kulaha mn el database w b3d kda n7otaha f response b format json 3shan el frontend y2dr yst5dmha
+// fetch events
 router.get("/", async (req, res) => {
   const events = await Event.find();
   res.json(events);
 });
 
-// ha fetch event wa7da be id
+// fetch single event
 router.get("/:id", async (req, res) => {
   const event = await Event.findById(req.params.id);
   res.json(event);
 });
 
-//create event, ha receive data mn el frontend w b3d kda ha saveha f database w b3d kda ha return el event el gdida f response f json
-router.post("/", async (req, res) => {
+// create event (admin only)
+router.post("/", auth, async (req, res) => {
   try {
+
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ message: "Admins only" });
+    }
+
     const event = new Event(req.body);
-    await event.save(); 
+
+    await event.save();
+
     res.status(201).json(event);
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-//booking - ha check awl en el event 3ndo available seats, lw mafeesh ha return error, lw fe available seats ha decrement w b3d kda ha return el event f json
-router.put("/:id/book", async (req, res) => {
+// booking
+router.put("/:id/book", auth, async (req, res) => {
+
   const event = await Event.findOneAndUpdate(
-    { _id: req.params.id, available: { $gt: 0 } }, //check mawgod seats wla la
+    { _id: req.params.id, available: { $gt: 0 } },
     { $inc: { available: -1 } },
     { returnDocument: "after" }
   );
-  if (!event) return res.status(409).json({ message: "Sold out" });
+
+  if (!event) {
+    return res.status(409).json({ message: "Sold out" });
+  }
+
   res.json(event);
 });
 
-// delete booking - ha increment el available seats be 1 w b3d kda ha return el event f json
-router.put("/:id/cancel", async (req, res) => {
+// cancel booking
+router.put("/:id/cancel", auth, async (req, res) => {
+
   const event = await Event.findByIdAndUpdate(
     req.params.id,
-    { $inc: { available: 1 } }, // Restore seat
+    { $inc: { available: 1 } },
     { returnDocument: "after" }
   );
+
   res.json(event);
 });
 
-// Edit event - ha receive data mn el frontend w b3d kda ha update el event f database w b3d kda ha return el event f json
-router.put("/:id", async (req, res) => {
-  const event = await Event.findByIdAndUpdate(req.params.id, req.body, { returnDocument: "after" });
+// edit event
+router.put("/:id", auth, async (req, res) => {
+
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  const event = await Event.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { returnDocument: "after" }
+  );
+
   res.json(event);
 });
 
-// Remove event - ha delete el event f database w b3d kda ha return message f json
-router.delete("/:id", async (req, res) => {
+// delete event
+router.delete("/:id", auth, async (req, res) => {
+
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
   await Event.findByIdAndDelete(req.params.id);
+
   res.json({ message: "Event deleted" });
 });
 

@@ -6,16 +6,31 @@ const logoutBtn   = document.getElementById("logout");
 const registerBtn = document.getElementById("registerBtn");
 const loginBtn    = document.getElementById("loginBtn");
 
-let currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
+let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+const token = localStorage.getItem("token");
 
 const API = "/api";
 
 async function apiFetch(path, options = {}) {
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(API + path, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
-  if (!res.ok) throw new Error(await res.text());
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
   return res.json();
 }
 
@@ -23,8 +38,12 @@ function goRegister() { window.location.href = "/register/register.html"; }
 function goLogin()    { window.location.href = "/login/login.html"; }
 
 function logout() {
-  sessionStorage.removeItem("currentUser");
+
+  localStorage.removeItem("currentUser");
+  localStorage.removeItem("token");
+
   currentUser = null;
+
   updateUI();
 }
 
@@ -95,14 +114,25 @@ async function book(id) {
   if (!currentUser) { window.location.href = "/login/login.html"; return; }
 
   try {
-    const res = await fetch(`/api/events/${id}/book`, { method: "PUT" });
+    const res = await fetch(`/api/events/${id}/book`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
     if (res.status === 409) { renderEvents(); return; }
     const eventData = await res.json();
-    await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user: currentUser.email, eventId: id, event: eventData.name }),
-    });
+ await fetch("/api/bookings", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    eventId: id,
+    event: eventData.name
+  }),
+});
     renderEvents();
     renderBookings();
   } catch (e) {
@@ -113,11 +143,25 @@ async function book(id) {
 /* ── Cancel Booking ── */
 async function cancelBooking(eventId) {
   try {
-    const bookings = await fetch("/api/bookings").then(r => r.json());
+    const bookings = await fetch("/api/bookings", {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+}).then(r => r.json());
     const booking  = bookings.find(b => b.user === currentUser.email && b.eventId === eventId);
     if (!booking) return;
-    await fetch(`/api/bookings/${booking._id}`, { method: "DELETE" });
-    await fetch(`/api/events/${eventId}/cancel`,  { method: "PUT" });
+    await fetch(`/api/bookings/${booking._id}`, {
+  method: "DELETE",
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
+   await fetch(`/api/events/${eventId}/cancel`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
     renderEvents();
     renderBookings();
   } catch (e) {
