@@ -224,6 +224,29 @@ body {
   color: var(--green-mid);
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: 0 0 18px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.google-auth-button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
 /* Responsive */
 @media (max-width: 991px) {
   .auth-right { background: var(--surface); }

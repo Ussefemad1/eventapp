@@ -6,9 +6,8 @@ const auth    = require("../middleware/auth");
 // fetch bookings
 router.get("/", auth, async (req, res) => {
 
-  const bookings = await Booking.find({
-    user: req.user.email
-  });
+  const filter = req.user.isAdmin ? {} : { user: req.user.email };
+  const bookings = await Booking.find(filter);
 
   res.json(bookings);
 });
@@ -22,7 +21,7 @@ router.get("/:id", auth, async (req, res) => {
     return res.status(404).json({ message: "Booking not found" });
   }
 
-  if (booking.user !== req.user.email) {
+  if (!req.user.isAdmin && booking.user !== req.user.email) {
     return res.status(403).json({ message: "Unauthorized" });
   }
 
@@ -56,7 +55,7 @@ router.put("/:id", auth, async (req, res) => {
     return res.status(404).json({ message: "Booking not found" });
   }
 
-  if (booking.user !== req.user.email) {
+  if (!req.user.isAdmin && booking.user !== req.user.email) {
     return res.status(403).json({ message: "Unauthorized" });
   }
 
@@ -78,7 +77,7 @@ router.delete("/:id", auth, async (req, res) => {
     return res.status(404).json({ message: "Booking not found" });
   }
 
-  if (booking.user !== req.user.email) {
+  if (!req.user.isAdmin && booking.user !== req.user.email) {
     return res.status(403).json({ message: "Unauthorized" });
   }
 

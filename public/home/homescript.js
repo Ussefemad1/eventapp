@@ -1,15 +1,78 @@
 const userInfo    = document.getElementById("userInfo");
 const adminPanel  = document.getElementById("adminPanel");
 const eventsDiv   = document.getElementById("events");
-const bookingsDiv = document.getElementById("bookings");
 const logoutBtn   = document.getElementById("logout");
 const registerBtn = document.getElementById("registerBtn");
 const loginBtn    = document.getElementById("loginBtn");
+const profileBtn  = document.getElementById("profileBtn");
 
 let currentUser = JSON.parse(localStorage.getItem("currentUser"));
 const token = localStorage.getItem("token");
 
 const API = "/api";
+
+const CATEGORY_IMAGES = {
+  music: {
+    label: "Music",
+    image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=900&q=80",
+  },
+  football: {
+    label: "Football",
+    image: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=900&q=80",
+  },
+  technology: {
+    label: "Technology",
+    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
+  },
+  business: {
+    label: "Business",
+    image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80",
+  },
+  education: {
+    label: "Education",
+    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=900&q=80",
+  },
+  food: {
+    label: "Food",
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=80",
+  },
+  art: {
+    label: "Art",
+    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=80",
+  },
+  theater: {
+    label: "Theater",
+    image: "https://images.unsplash.com/photo-1503095396549-807759245b35?auto=format&fit=crop&w=900&q=80",
+  },
+  sports: {
+    label: "Sports",
+    image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=900&q=80",
+  },
+};
+
+const DEFAULT_EVENT_IMAGE =
+  "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=900&q=80";
+
+function normalizeCategory(category) {
+  return String(category || "").trim().toLowerCase();
+}
+
+function getCategoryMeta(category) {
+  const key = normalizeCategory(category);
+  return CATEGORY_IMAGES[key] || {
+    label: String(category || "Event").trim() || "Event",
+    image: DEFAULT_EVENT_IMAGE,
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 async function apiFetch(path, options = {}) {
 
@@ -34,8 +97,195 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
-function goRegister() { window.location.href = "/register/register.html"; }
-function goLogin()    { window.location.href = "/login/login.html"; }
+function goRegister() { window.location.href = "../register/register.html"; }
+function goLogin()    { window.location.href = "../login/login.html"; }
+function goProfile()  { window.location.href = "../profile/profile.html"; }
+
+function getToastContainer() {
+  let container = document.getElementById("toastContainer");
+
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container position-fixed top-0 end-0 p-3";
+    container.style.zIndex = "1080";
+    document.body.appendChild(container);
+  }
+
+  return container;
+}
+
+function showToast(message, type = "success", title = "Eventify") {
+  const toast = document.createElement("div");
+  const textClass = type === "success" ? "text-bg-success" : "text-bg-danger";
+
+  toast.className = `toast align-items-stretch border-0 ${textClass}`;
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "assertive");
+  toast.setAttribute("aria-atomic", "true");
+
+  toast.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">
+        <strong class="d-block mb-1">${title}</strong>
+        <span>${message}</span>
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>`;
+
+  getToastContainer().appendChild(toast);
+
+  const instance = new bootstrap.Toast(toast, { delay: 5000 });
+  toast.addEventListener("hidden.bs.toast", () => toast.remove());
+  instance.show();
+}
+
+function showPaymentAlert(message, type = "danger") {
+  let alertBox = document.getElementById("paymentAlert");
+
+  if (!alertBox) {
+    alertBox = document.createElement("div");
+    alertBox.id = "paymentAlert";
+    const modalBody = document.querySelector("#paymentModal .modal-body");
+    if (modalBody) modalBody.prepend(alertBox);
+  }
+
+  alertBox.className = `alert alert-${type} py-2 mb-3`;
+  alertBox.textContent = message;
+  alertBox.style.display = "block";
+}
+
+function clearPaymentAlert() {
+  const alertBox = document.getElementById("paymentAlert");
+  if (alertBox) alertBox.style.display = "none";
+}
+
+function onlyDigits(value) {
+  return value.replace(/\D/g, "");
+}
+
+function formatCardNumber(value) {
+  return onlyDigits(value).slice(0, 19).replace(/(.{4})/g, "$1 ").trim();
+}
+
+function formatExpiry(value) {
+  const digits = onlyDigits(value).slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+function passesLuhnCheck(cardNumber) {
+  let sum = 0;
+  let shouldDouble = false;
+
+  for (let i = cardNumber.length - 1; i >= 0; i--) {
+    let digit = Number(cardNumber[i]);
+
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  return sum > 0 && sum % 10 === 0;
+}
+
+function isValidExpiry(value) {
+  const match = value.match(/^(\d{2})\/(\d{2})$/);
+  if (!match) return false;
+
+  const month = Number(match[1]);
+  const year = 2000 + Number(match[2]);
+  if (month < 1 || month > 12) return false;
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  return year > currentYear || (year === currentYear && month >= currentMonth);
+}
+
+function setFieldState(field, isValid) {
+  field.classList.toggle("is-invalid", !isValid);
+  field.classList.toggle("is-valid", isValid);
+}
+
+function clearCardValidation() {
+  ["cardHolder", "cardNumber", "cardExpiry", "cardCVV"].forEach(id => {
+    const field = document.getElementById(id);
+    if (!field) return;
+    field.classList.remove("is-invalid", "is-valid");
+  });
+}
+
+function validateCardField(field, showState = true) {
+  let isValid = false;
+  const value = field.value.trim();
+
+  if (field.id === "cardHolder") {
+    isValid = /^[A-Za-z][A-Za-z\s'.-]{2,}$/.test(value) && value.trim().includes(" ");
+  } else if (field.id === "cardNumber") {
+    const digits = onlyDigits(value);
+    isValid = digits.length >= 13 && digits.length <= 19 && passesLuhnCheck(digits);
+  } else if (field.id === "cardExpiry") {
+    isValid = isValidExpiry(value);
+  } else if (field.id === "cardCVV") {
+    isValid = /^\d{3,4}$/.test(value);
+  }
+
+  if (showState) setFieldState(field, isValid);
+  return isValid;
+}
+
+function validateCardDetails() {
+  const fields = ["cardHolder", "cardNumber", "cardExpiry", "cardCVV"]
+    .map(id => document.getElementById(id));
+
+  const invalidFields = fields.filter(field => !validateCardField(field));
+
+  if (invalidFields.length) {
+    invalidFields[0].focus();
+    showPaymentAlert("Please fix the highlighted card details.");
+    return false;
+  }
+
+  clearPaymentAlert();
+  return true;
+}
+
+function setupCardInputValidation() {
+  const holder = document.getElementById("cardHolder");
+  const number = document.getElementById("cardNumber");
+  const expiry = document.getElementById("cardExpiry");
+  const cvv = document.getElementById("cardCVV");
+
+  holder.addEventListener("input", () => {
+    holder.value = holder.value.replace(/[^A-Za-z\s'.-]/g, "").replace(/\s{2,}/g, " ");
+    if (holder.value.trim()) validateCardField(holder);
+    else holder.classList.remove("is-invalid", "is-valid");
+  });
+
+  number.addEventListener("input", () => {
+    number.value = formatCardNumber(number.value);
+    if (number.value.trim()) validateCardField(number);
+    else number.classList.remove("is-invalid", "is-valid");
+  });
+
+  expiry.addEventListener("input", () => {
+    expiry.value = formatExpiry(expiry.value);
+    if (expiry.value.trim()) validateCardField(expiry);
+    else expiry.classList.remove("is-invalid", "is-valid");
+  });
+
+  cvv.addEventListener("input", () => {
+    cvv.value = onlyDigits(cvv.value).slice(0, 4);
+    if (cvv.value.trim()) validateCardField(cvv);
+    else cvv.classList.remove("is-invalid", "is-valid");
+  });
+}
 
 function logout() {
 
@@ -95,77 +345,50 @@ function showAdminMsg(msg, type) {
   if (!el) {
     el = document.createElement("div");
     el.id = "adminMsg";
-    el.style.cssText = "border-radius:9px;padding:11px 16px;font-size:.875rem;margin-bottom:20px;";
     const panel = document.querySelector(".ev-admin-panel .ev-section-header");
     if (panel) panel.insertAdjacentElement("afterend", el);
   }
+  el.className = `alert ${type === "success" ? "alert-success" : "alert-danger"} py-2 mb-4`;
   el.style.display = "block";
-  if (type === "success") {
-    el.style.background = "#e6f4ec"; el.style.border = "1px solid #a7d9bc"; el.style.color = "#1a6639";
-  } else {
-    el.style.background = "#fef2f2"; el.style.border = "1px solid #fecaca"; el.style.color = "#b91c1c";
-  }
   el.textContent = msg;
   setTimeout(() => { el.style.display = "none"; }, 4000);
 }
 
 /* ── Book Event ── */
+let selectedEvent = null;
+let paymentModal = null;
+
 async function book(id) {
-  if (!currentUser) { window.location.href = "/login/login.html"; return; }
+
+  if (!currentUser) {
+    window.location.href = "../login/login.html";
+    return;
+  }
 
   try {
-    const res = await fetch(`/api/events/${id}/book`, {
-  method: "PUT",
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-});
-    if (res.status === 409) { renderEvents(); return; }
-    const eventData = await res.json();
- await fetch("/api/bookings", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`
-  },
-  body: JSON.stringify({
-    eventId: id,
-    event: eventData.name
-  }),
-});
-    renderEvents();
-    renderBookings();
+
+    selectedEvent = await apiFetch(`/events/${id}`);
+
+    document.getElementById("paymentEventName").textContent =
+      selectedEvent.name;
+
+    document.getElementById("paymentEventPrice").textContent =
+      `${selectedEvent.price} EGP`;
+
+    document.getElementById("cardForm").style.display = "none";
+    clearCardValidation();
+    clearPaymentAlert();
+
+    if (!paymentModal) {
+      paymentModal = new bootstrap.Modal(
+        document.getElementById("paymentModal")
+      );
+    }
+
+    paymentModal.show();
+
   } catch (e) {
     console.error("Booking error:", e.message);
-  }
-}
-
-/* ── Cancel Booking ── */
-async function cancelBooking(eventId) {
-  try {
-    const bookings = await fetch("/api/bookings", {
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-}).then(r => r.json());
-    const booking  = bookings.find(b => b.user === currentUser.email && b.eventId === eventId);
-    if (!booking) return;
-    await fetch(`/api/bookings/${booking._id}`, {
-  method: "DELETE",
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-});
-   await fetch(`/api/events/${eventId}/cancel`, {
-  method: "PUT",
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-});
-    renderEvents();
-    renderBookings();
-  } catch (e) {
-    console.error("Cancel error:", e.message);
   }
 }
 
@@ -178,7 +401,6 @@ async function deleteEvent(id) {
       await apiFetch("/bookings/" + b._id, { method: "DELETE" });
     }
     renderEvents();
-    renderBookings();
   } catch (e) {
     console.error("Delete error:", e.message);
   }
@@ -205,6 +427,9 @@ async function renderEvents() {
     eventsDiv.innerHTML = events.map(e => {
       const soldOut = e.available <= 0;
       const low     = e.available > 0 && e.available <= 10;
+      const category = getCategoryMeta(e.category);
+      const eventName = escapeHtml(e.name);
+      const eventVenue = escapeHtml(e.venue);
 
       const seatsHtml = soldOut
         ? `<span class="ev-seats-badge sold-out">Sold Out</span>`
@@ -224,14 +449,21 @@ async function renderEvents() {
       return `
         <div class="col-lg-4 col-md-6 d-flex">
           <div class="ev-event-card w-100 d-flex flex-column">
-            <div class="ev-card-accent"></div>
+            <div class="ev-card-image-wrap">
+              <img
+                class="ev-card-image"
+                src="${category.image}"
+                alt="${escapeHtml(category.label)} event image"
+                loading="lazy"
+              >
+            </div>
             <div class="ev-card-body d-flex flex-column flex-grow-1">
-              <span class="ev-card-chip">${e.category}</span>
-              <h3 class="ev-card-title">${e.name}</h3>
+              <span class="ev-card-chip">${escapeHtml(category.label)}</span>
+              <h3 class="ev-card-title">${eventName}</h3>
               <div class="ev-card-meta">
                 <div class="ev-meta-row">
                   <svg class="ev-meta-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                  ${e.venue}
+                  ${eventVenue}
                 </div>
                 <div class="ev-meta-row">
                   <svg class="ev-meta-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -255,69 +487,6 @@ async function renderEvents() {
   }
 }
 
-/* ── Render Bookings ── */
-async function renderBookings() {
-  const count = document.getElementById("bookingsCount");
-
-  if (!currentUser) {
-    if (count) count.textContent = "0 bookings";
-    bookingsDiv.innerHTML = `
-      <div class="ev-empty">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
-        <p>Login to view your bookings.</p>
-      </div>`;
-    return;
-  }
-
-  bookingsDiv.innerHTML = renderSkeleton(2);
-
-  try {
-    const all  = await apiFetch("/bookings");
-    const mine = all.filter(b => b.user === currentUser.email);
-    if (count) count.textContent = `${mine.length} booking${mine.length !== 1 ? "s" : ""}`;
-
-    if (!mine.length) {
-      bookingsDiv.innerHTML = `
-        <div class="ev-empty">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
-          <p>No bookings yet. Find an event and book your spot!</p>
-        </div>`;
-      return;
-    }
-
-    bookingsDiv.innerHTML = mine.map(b => `
-      <div class="col-lg-4 col-md-6 d-flex">
-        <div class="ev-ticket-card w-100 d-flex flex-column">
-          <div class="ev-ticket-top">
-            <div class="ev-ticket-label">Eventify Ticket</div>
-            <div class="ev-ticket-name">${b.event}</div>
-            <div class="ev-ticket-meta">
-              <div class="ev-ticket-row">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                Booking #${String(b._id).slice(-6).toUpperCase()}
-              </div>
-              <div class="ev-ticket-row">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/></svg>
-                ${b.user}
-              </div>
-            </div>
-          </div>
-          <div class="ev-ticket-divider"><div class="ev-ticket-dot"></div></div>
-          <div class="ev-ticket-bottom mt-auto">
-            <div>
-              <div class="ev-ticket-price-label">Status</div>
-              <div class="ev-ticket-status">Confirmed ✓</div>
-            </div>
-            <button class="ev-btn-cancel" onclick='cancelBooking("${b.eventId}")'>Cancel</button>
-          </div>
-        </div>
-      </div>`).join("");
-
-  } catch (e) {
-    bookingsDiv.innerHTML = "";
-  }
-}
-
 /* ── Skeleton Loader ── */
 function renderSkeleton(count) {
   return Array.from({ length: count }, () => `
@@ -336,21 +505,127 @@ function renderSkeleton(count) {
 
 /* ── Update UI ── */
 function updateUI() {
+  const isAdmin = currentUser?.isAdmin === true;
+
   if (currentUser) {
-    userInfo.innerHTML  = `Hello, <strong>${currentUser.name}</strong> &mdash; ${currentUser.email}`;
+    userInfo.innerHTML = "";
+    userInfo.append("Hello, ");
+    const name = document.createElement("strong");
+    name.textContent = currentUser.name;
+    userInfo.appendChild(name);
     registerBtn.style.display = "none";
     loginBtn.style.display    = "none";
+    profileBtn.style.display  = "inline-block";
     logoutBtn.style.display   = "inline-flex";
-    adminPanel.style.display  = currentUser.isAdmin === true ? "block" : "none";
+    adminPanel.style.display  = isAdmin ? "block" : "none";
   } else {
     userInfo.innerHTML = "Browse upcoming events or login to book your tickets.";
     logoutBtn.style.display   = "none";
+    profileBtn.style.display  = "none";
     adminPanel.style.display  = "none";
     loginBtn.style.display    = "inline-block";
     registerBtn.style.display = "inline-block";
   }
+
   renderEvents();
-  renderBookings();
 }
 
+/* ── Payment Logic ── */
+
+document.getElementById("cashPaymentBtn").addEventListener("click", async () => {
+
+  try {
+    clearPaymentAlert();
+
+    await completeBooking({
+      paymentMethod: "cash",
+      paymentStatus: "pending",
+    });
+
+    paymentModal.hide();
+
+    showToast(
+      "Booking confirmed. Please visit the nearest Eventify store within 24 hours to complete payment.",
+      "success",
+      "Booking confirmed"
+    );
+
+  } catch (e) {
+    showToast("Booking failed. Please try again.", "danger", "Booking failed");
+  }
+});
+
+document.getElementById("cardPaymentBtn").addEventListener("click", () => {
+
+  document.getElementById("cardForm").style.display = "block";
+  clearPaymentAlert();
+});
+
+document.getElementById("confirmCardPaymentBtn").addEventListener("click", async () => {
+
+  if (!validateCardDetails()) {
+    return;
+  }
+
+  try {
+    clearPaymentAlert();
+
+    const btn = document.getElementById("confirmCardPaymentBtn");
+
+    btn.disabled = true;
+    btn.textContent = "Processing Payment...";
+
+    // fake payment delay
+    await new Promise(resolve => setTimeout(resolve, 1800));
+
+    await completeBooking({
+      paymentMethod: "card",
+      paymentStatus: "paid",
+    });
+
+    paymentModal.hide();
+
+    showToast("Payment successful. Your booking has been confirmed.", "success", "Payment complete");
+
+  } catch (e) {
+
+    showPaymentAlert("Payment failed. Please try again.");
+
+  } finally {
+
+    const btn = document.getElementById("confirmCardPaymentBtn");
+
+    btn.disabled = false;
+    btn.textContent = "Pay Securely";
+  }
+});
+
+async function completeBooking(paymentData) {
+
+  await fetch(`/api/events/${selectedEvent._id}/book`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  await fetch("/api/bookings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      eventId: selectedEvent._id,
+      event: selectedEvent.name,
+      amount: selectedEvent.price,
+      paymentMethod: paymentData.paymentMethod,
+      paymentStatus: paymentData.paymentStatus,
+    }),
+  });
+
+  renderEvents();
+}
+
+setupCardInputValidation();
 updateUI();

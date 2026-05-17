@@ -4,11 +4,70 @@ const User    = require("../models/user");
 const bcrypt  = require("bcryptjs");
 const jwt     = require("jsonwebtoken");
 const auth    = require("../middleware/auth");
+const crypto  = require("crypto");
+
+function createAuthResponse(user) {
+  const token = jwt.sign(
+    {
+      id: user._id,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      name: user.name
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  return {
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      age: user.age,
+      gender: user.gender,
+      isAdmin: user.isAdmin
+    }
+  };
+}
+
+async function verifyGoogleCredential(credential) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+
+  if (!clientId) {
+    throw new Error("Google sign up is not configured");
+  }
+
+  const tokenInfoUrl =
+    "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(credential);
+
+  const response = await fetch(tokenInfoUrl);
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error_description || "Invalid Google credential");
+  }
+
+  if (payload.aud !== clientId) {
+    throw new Error("Google credential is for a different app");
+  }
+
+  if (payload.email_verified !== "true" && payload.email_verified !== true) {
+    throw new Error("Google email is not verified");
+  }
+
+  return payload;
+}
 
 // fetch all users
 router.get("/", auth, async (req, res) => {
   const users = await User.find().select("-password");
   res.json(users);
+});
+
+router.get("/google-client-id", (req, res) => {
+  res.json({ clientId: process.env.GOOGLE_CLIENT_ID || "" });
 });
 
 // fetch user bel id
@@ -56,29 +115,49 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid login" });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-        email: user.email,
-        isAdmin: user.isAdmin,
-        name: user.name
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        isAdmin: user.isAdmin
-      }
-    });
+    res.json(createAuthResponse(user));
 
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// sign up / sign in with Google
+router.post("/google", async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential is required" });
+    }
+
+    const googleUser = await verifyGoogleCredential(credential);
+    const email = String(googleUser.email || "").toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ message: "Google account has no email address" });
+    }
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = new User({
+        name: googleUser.name || email.split("@")[0],
+        email,
+        phone: "",
+        age: null,
+        gender: "",
+        isAdmin: false,
+        password: crypto.randomBytes(24).toString("hex"),
+      });
+
+      await user.save();
+    }
+
+    res.json(createAuthResponse(user));
+
+  } catch (err) {
+    res.status(401).json({ message: err.message });
   }
 });
 
@@ -92,6 +171,76 @@ router.get("/me/profile", auth, async (req, res) => {
     }
 
     res.json(user);
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// change password for current logged in user
+router.put("/me/password", auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordPattern.test(newPassword)) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, and a number"
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const match = await bcrypt.compare(currentPassword, user.password);
+
+    if (!match) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password changed successfully" });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// reset forgotten password
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ message: "Email and new password are required" });
+    }
+
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordPattern.test(newPassword)) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, and a number"
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password reset successfully. You can sign in now." });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
