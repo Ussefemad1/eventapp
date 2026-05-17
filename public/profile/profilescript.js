@@ -63,9 +63,9 @@ function renderProfile(user) {
   document.getElementById("detailAge").textContent = user.age || "-";
   document.getElementById("detailGender").textContent = user.gender || "-";
 
-  if (bookingsSection) {
-    bookingsSection.style.display = user.isAdmin ? "none" : "block";
-  }
+ if (bookingsSection) {
+  bookingsSection.style.display = currentUser?.isAdmin === true ? "none" : "block";
+}
 }
 
 function renderBookingsSkeleton() {

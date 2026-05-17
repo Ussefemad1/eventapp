@@ -4,16 +4,19 @@ const bookingSchema = new mongoose.Schema({
   user: {
     type: String,
     required: true,
+    trim: true,
   },
 
   eventId: {
     type: String,
     required: true,
+    trim: true,
   },
 
   event: {
     type: String,
     required: true,
+    trim: true,
   },
 
   paymentMethod: {
@@ -31,6 +34,7 @@ const bookingSchema = new mongoose.Schema({
   amount: {
     type: Number,
     default: 0,
+    min: 0,
   },
 
   createdAt: {

@@ -79,10 +79,21 @@
         </div>
       </div>
 
-      <div class="mb-4">
-        <label class="auth-label">Password</label>
-        <input id="password" type="password" class="form-control auth-input" placeholder="Min. 6 characters"/>
-      </div>
+     <div class="mb-4">
+  <label class="auth-label">Password</label>
+
+  <input
+    id="password"
+    type="password"
+    class="form-control auth-input"
+    placeholder="Minimum 8 characters"
+    autocomplete="new-password"
+  />
+
+  <div class="form-text mt-2">
+    Password must contain uppercase, lowercase, and a number.
+  </div>
+</div>
 
       <button onclick="register()" class="btn auth-btn-primary w-100 mb-4">
         Create Account

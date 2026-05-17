@@ -52,7 +52,14 @@ async function register() {
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, phone, age: numericAge, gender, password, isAdmin: false }),
+      body: JSON.stringify({
+  name,
+  email,
+  phone,
+  age: numericAge,
+  gender,
+  password,
+}),
     });
 
     if (!res.ok) {

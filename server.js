@@ -1,11 +1,27 @@
 require("dotenv").config();
 const express = require("express");
 const connectDB = require("./database/db.js");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+//const mongoSanitize = require("express-mongo-sanitize");
 
 const app = express();
 connectDB();
 
 app.use(express.json());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+//app.use(mongoSanitize());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
 app.use(express.static("public"));
 
 app.get("/", (req, res) => {

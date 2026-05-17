@@ -1,10 +1,12 @@
 const express = require("express");
-const router  = express.Router();
-const User    = require("../models/user");
-const bcrypt  = require("bcryptjs");
-const jwt     = require("jsonwebtoken");
-const auth    = require("../middleware/auth");
-const crypto  = require("crypto");
+const router = express.Router();
+
+const User = require("../models/user");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const auth = require("../middleware/auth");
+const admin = require("../middleware/admin");
+const crypto = require("crypto");
 
 function createAuthResponse(user) {
   const token = jwt.sign(
@@ -60,8 +62,8 @@ async function verifyGoogleCredential(credential) {
   return payload;
 }
 
-// fetch all users
-router.get("/", auth, async (req, res) => {
+// fetch all users (ADMIN ONLY)
+router.get("/", auth, admin, async (req, res) => {
   const users = await User.find().select("-password");
   res.json(users);
 });
@@ -70,7 +72,7 @@ router.get("/google-client-id", (req, res) => {
   res.json({ clientId: process.env.GOOGLE_CLIENT_ID || "" });
 });
 
-// fetch user bel id
+// fetch user by id
 router.get("/:id", auth, async (req, res) => {
   const user = await User.findById(req.params.id).select("-password");
   res.json(user);
@@ -85,7 +87,15 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Email already exists" });
     }
 
-    const user = new User(req.body);
+    const user = new User({
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      age: req.body.age,
+      gender: req.body.gender,
+      password: req.body.password,
+      isAdmin: false,
+    });
 
     await user.save();
 
@@ -177,16 +187,19 @@ router.get("/me/profile", auth, async (req, res) => {
   }
 });
 
-// change password for current logged in user
+// change password
 router.put("/me/password", auth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required" });
+      return res.status(400).json({
+        message: "Current password and new password are required"
+      });
     }
 
     const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
     if (!passwordPattern.test(newPassword)) {
       return res.status(400).json({
         message: "Password must be at least 8 characters and include uppercase, lowercase, and a number"
@@ -202,29 +215,37 @@ router.put("/me/password", auth, async (req, res) => {
     const match = await bcrypt.compare(currentPassword, user.password);
 
     if (!match) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      return res.status(401).json({
+        message: "Current password is incorrect"
+      });
     }
 
     user.password = newPassword;
+
     await user.save();
 
-    res.json({ message: "Password changed successfully" });
+    res.json({
+      message: "Password changed successfully"
+    });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// reset forgotten password
+// forgot password
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email, newPassword } = req.body;
 
     if (!email || !newPassword) {
-      return res.status(400).json({ message: "Email and new password are required" });
+      return res.status(400).json({
+        message: "Email and new password are required"
+      });
     }
 
     const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
     if (!passwordPattern.test(newPassword)) {
       return res.status(400).json({
         message: "Password must be at least 8 characters and include uppercase, lowercase, and a number"
@@ -234,21 +255,26 @@ router.post("/forgot-password", async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: "No account found with this email" });
+      return res.status(404).json({
+        message: "No account found with this email"
+      });
     }
 
     user.password = newPassword;
+
     await user.save();
 
-    res.json({ message: "Password reset successfully. You can sign in now." });
+    res.json({
+      message: "Password reset successfully. You can sign in now."
+    });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Edit user details
-router.put("/:id", auth, async (req, res) => {
+// edit user (ADMIN ONLY)
+router.put("/:id", auth, admin, async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,
     req.body,
@@ -258,10 +284,13 @@ router.put("/:id", auth, async (req, res) => {
   res.json(user);
 });
 
-// Remove user
-router.delete("/:id", auth, async (req, res) => {
+// delete user (ADMIN ONLY)
+router.delete("/:id", auth, admin, async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
-  res.json({ message: "User deleted" });
+
+  res.json({
+    message: "User deleted"
+  });
 });
 
 module.exports = router;
