@@ -3,7 +3,6 @@ const express = require("express");
 const connectDB = require("./database/db.js");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-//const mongoSanitize = require("express-mongo-sanitize");
 
 const app = express();
 connectDB();
@@ -15,7 +14,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
   })
 );
-//app.use(mongoSanitize());
+
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -32,4 +31,5 @@ app.use("/api/users",    require("./routes/userRoutes"));
 app.use("/api/events",   require("./routes/eventRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoute"));
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
