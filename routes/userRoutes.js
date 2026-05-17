@@ -62,20 +62,10 @@ async function verifyGoogleCredential(credential) {
   return payload;
 }
 
-// fetch all users (ADMIN ONLY)
-router.get("/", auth, admin, async (req, res) => {
-  const users = await User.find().select("-password");
-  res.json(users);
-});
+// ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
 
 router.get("/google-client-id", (req, res) => {
   res.json({ clientId: process.env.GOOGLE_CLIENT_ID || "" });
-});
-
-// fetch user by id
-router.get("/:id", auth, async (req, res) => {
-  const user = await User.findById(req.params.id).select("-password");
-  res.json(user);
 });
 
 // register
@@ -99,9 +89,7 @@ router.post("/", async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({
-      message: "User created successfully"
-    });
+    res.status(201).json({ message: "User created successfully" });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -113,7 +101,9 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+
     const user = await User.findOne({ email });
+
 
     if (!user) {
       return res.status(401).json({ message: "Invalid login" });
@@ -171,7 +161,47 @@ router.post("/google", async (req, res) => {
   }
 });
 
-// current logged in user
+// forgot password
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        message: "Email and new password are required"
+      });
+    }
+
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordPattern.test(newPassword)) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters and include uppercase, lowercase, and a number"
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "No account found with this email"
+      });
+    }
+
+    user.password = newPassword;
+
+    await user.save();
+
+    res.json({ message: "Password reset successfully. You can sign in now." });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ─── PROTECTED /me ROUTES — must come BEFORE /:id ─────────────────────────────
+
+// current logged in user profile
 router.get("/me/profile", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -215,62 +245,26 @@ router.put("/me/password", auth, async (req, res) => {
     const match = await bcrypt.compare(currentPassword, user.password);
 
     if (!match) {
-      return res.status(401).json({
-        message: "Current password is incorrect"
-      });
+      return res.status(401).json({ message: "Current password is incorrect" });
     }
 
     user.password = newPassword;
 
     await user.save();
 
-    res.json({
-      message: "Password changed successfully"
-    });
+    res.json({ message: "Password changed successfully" });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// forgot password
-router.post("/forgot-password", async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
+// ─── ADMIN ROUTES ─────────────────────────────────────────────────────────────
 
-    if (!email || !newPassword) {
-      return res.status(400).json({
-        message: "Email and new password are required"
-      });
-    }
-
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
-    if (!passwordPattern.test(newPassword)) {
-      return res.status(400).json({
-        message: "Password must be at least 8 characters and include uppercase, lowercase, and a number"
-      });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({
-        message: "No account found with this email"
-      });
-    }
-
-    user.password = newPassword;
-
-    await user.save();
-
-    res.json({
-      message: "Password reset successfully. You can sign in now."
-    });
-
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+// fetch all users (ADMIN ONLY)
+router.get("/", auth, admin, async (req, res) => {
+  const users = await User.find().select("-password");
+  res.json(users);
 });
 
 // edit user (ADMIN ONLY)
@@ -288,9 +282,15 @@ router.put("/:id", auth, admin, async (req, res) => {
 router.delete("/:id", auth, admin, async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
 
-  res.json({
-    message: "User deleted"
-  });
+  res.json({ message: "User deleted" });
+});
+
+// ─── DYNAMIC /:id — must come LAST ────────────────────────────────────────────
+
+// fetch user by id
+router.get("/:id", auth, async (req, res) => {
+  const user = await User.findById(req.params.id).select("-password");
+  res.json(user);
 });
 
 module.exports = router;
