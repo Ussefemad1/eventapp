@@ -81,57 +81,75 @@ function validateNewPassword(newPassword, confirmPassword) {
 
 async function resetPassword() {
   const email = document.getElementById("forgotEmail").value.trim();
-  const newPassword = document.getElementById("forgotNewPassword").value.trim();
-  const confirmPassword = document.getElementById("forgotConfirmPassword").value.trim();
+
   const forgotMsg = document.getElementById("forgotMsg");
   const successMsg = document.getElementById("successMsg");
   const resetBtn = document.getElementById("resetPasswordBtn");
+
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   forgotMsg.style.display = "none";
   successMsg.style.display = "none";
 
   if (!emailPattern.test(email)) {
-    showMessage(forgotMsg, "Please enter a valid email address.");
-    return;
-  }
-
-  const validationError = validateNewPassword(newPassword, confirmPassword);
-  if (validationError) {
-    showMessage(forgotMsg, validationError);
+    showMessage(
+      forgotMsg,
+      "Please enter a valid email address."
+    );
     return;
   }
 
   resetBtn.disabled = true;
-  resetBtn.textContent = "Resetting...";
+  resetBtn.textContent = "Sending...";
 
   try {
+
     const res = await fetch("/api/users/forgot-password", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, newPassword }),
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({ email }),
     });
 
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      showMessage(forgotMsg, data.message || "Could not reset password.");
+      showMessage(
+        forgotMsg,
+        data.message || "Could not send reset email."
+      );
       return;
     }
 
-    const modal = bootstrap.Modal.getInstance(document.getElementById("forgotPasswordModal"));
+    const modal = bootstrap.Modal.getInstance(
+      document.getElementById("forgotPasswordModal")
+    );
+
     if (modal) modal.hide();
 
-    document.getElementById("email").value = email;
-    document.getElementById("password").value = "";
-    document.getElementById("forgotNewPassword").value = "";
-    document.getElementById("forgotConfirmPassword").value = "";
-    showMessage(successMsg, data.message || "Password reset successfully. You can sign in now.", "success");
+    document.getElementById("forgotEmail").value = "";
+
+    showMessage(
+      successMsg,
+      data.message || "Password reset link sent to your email.",
+      "success"
+    );
+
   } catch (e) {
-    showMessage(forgotMsg, "Password reset failed: " + e.message);
+
+    showMessage(
+      forgotMsg,
+      "Failed to send reset email: " + e.message
+    );
+
   } finally {
+
     resetBtn.disabled = false;
     resetBtn.textContent = "Reset Password";
+
   }
 }
 
@@ -199,6 +217,9 @@ async function setupGoogleSignIn() {
       google.accounts.id.initialize({
         client_id: clientId,
         callback: response => finishGoogleAuth(response.credential),
+        use_fedcm_for_prompt: false,
+        ux_mode: "popup",            // 👈 force popup instead of redirect
+        cancel_on_tap_outside: false,
       });
 
       google.accounts.id.renderButton(button, {
