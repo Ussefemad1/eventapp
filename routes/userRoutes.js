@@ -10,12 +10,13 @@ const admin = require("../middleware/admin");
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  port: 587,        // ← changed
+  secure: false,    // ← changed (STARTTLS upgrades the connection)
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS, // App Password
   },
+  requireTLS: true, // ← forces TLS upgrade
 });
 
 function createAuthResponse(user) {
