@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
 const admin = require("../middleware/admin");
+
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
@@ -43,39 +44,7 @@ function createAuthResponse(user) {
   };
 }
 
-async function verifyGoogleCredential(credential) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-
-  if (!clientId) {
-    throw new Error("Google sign up is not configured");
-  }
-
-  const tokenInfoUrl =
-    "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(credential);
-
-  const response = await fetch(tokenInfoUrl);
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error_description || "Invalid Google credential");
-  }
-
-  if (payload.aud !== clientId) {
-    throw new Error("Google credential is for a different app");
-  }
-
-  if (payload.email_verified !== "true" && payload.email_verified !== true) {
-    throw new Error("Google email is not verified");
-  }
-
-  return payload;
-}
-
 // ─── PUBLIC ROUTES ────────────────────────────────────────────────────────────
-
-router.get("/google-client-id", (req, res) => {
-  res.json({ clientId: process.env.GOOGLE_CLIENT_ID || "" });
-});
 
 // register
 router.post("/", async (req, res) => {
@@ -110,9 +79,7 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-
     const user = await User.findOne({ email });
-
 
     if (!user) {
       return res.status(401).json({ message: "Invalid login" });
@@ -128,45 +95,6 @@ router.post("/login", async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ message: err.message });
-  }
-});
-
-// sign up / sign in with Google
-router.post("/google", async (req, res) => {
-  try {
-    const { credential } = req.body;
-
-    if (!credential) {
-      return res.status(400).json({ message: "Google credential is required" });
-    }
-
-    const googleUser = await verifyGoogleCredential(credential);
-    const email = String(googleUser.email || "").toLowerCase();
-
-    if (!email) {
-      return res.status(400).json({ message: "Google account has no email address" });
-    }
-
-    let user = await User.findOne({ email });
-
-    if (!user) {
-      user = new User({
-        name: googleUser.name || email.split("@")[0],
-        email,
-        phone: "",
-        age: null,
-        gender: "",
-        isAdmin: false,
-        password: crypto.randomBytes(24).toString("hex"),
-      });
-
-      await user.save();
-    }
-
-    res.json(createAuthResponse(user));
-
-  } catch (err) {
-    res.status(401).json({ message: err.message });
   }
 });
 
@@ -269,6 +197,7 @@ router.post("/forgot-password", async (req, res) => {
 
   }
 });
+
 // reset password
 router.post("/reset-password", async (req, res) => {
   try {
@@ -324,7 +253,7 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
-// ─── PROTECTED /me ROUTES — must come BEFORE /:id ─────────────────────────────
+// ─── PROTECTED /me ROUTES ─────────────────────────────────────────────────────
 
 // current logged in user profile
 router.get("/me/profile", auth, async (req, res) => {

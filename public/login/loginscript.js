@@ -153,92 +153,9 @@ async function resetPassword() {
   }
 }
 
-function showGoogleMsg(message) {
-  const googleMsg = document.getElementById("googleMsg");
-  if (!googleMsg) return;
-  googleMsg.textContent = message;
-  googleMsg.style.display = "block";
-}
-
-async function finishGoogleAuth(credential) {
-  const googleMsg = document.getElementById("googleMsg");
-  if (googleMsg) googleMsg.style.display = "none";
-
-  try {
-    const res = await fetch("/api/users/google", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ credential }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      showGoogleMsg(data.message || "Google sign in failed.");
-      return;
-    }
-
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("currentUser", JSON.stringify(data.user));
-    window.location.href = "/home/home.html";
-  } catch (e) {
-    showGoogleMsg("Google sign in failed: " + e.message);
-  }
-}
-
-function waitForGoogleIdentity(callback, attempts = 30) {
-  if (window.google?.accounts?.id) {
-    callback();
-    return;
-  }
-
-  if (attempts <= 0) {
-    showGoogleMsg("Google sign in is temporarily unavailable.");
-    return;
-  }
-
-  setTimeout(() => waitForGoogleIdentity(callback, attempts - 1), 150);
-}
-
-async function setupGoogleSignIn() {
-  const button = document.getElementById("googleSignInButton");
-  if (!button) return;
-
-  try {
-    const res = await fetch("/api/users/google-client-id");
-    const { clientId } = await res.json();
-
-    if (!clientId) {
-      showGoogleMsg("Google sign in is not configured yet.");
-      return;
-    }
-
-    waitForGoogleIdentity(() => {
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: response => finishGoogleAuth(response.credential),
-        use_fedcm_for_prompt: false,
-        ux_mode: "popup",            // 👈 force popup instead of redirect
-        cancel_on_tap_outside: false,
-      });
-
-      google.accounts.id.renderButton(button, {
-        theme: "outline",
-        size: "large",
-        shape: "rectangular",
-        text: "signin_with",
-        width: button.offsetWidth || 320,
-      });
-    });
-  } catch (e) {
-    showGoogleMsg("Could not load Google sign in.");
-  }
-}
-
 document.addEventListener("DOMContentLoaded", () => {
   const resetBtn = document.getElementById("resetPasswordBtn");
   if (resetBtn) resetBtn.addEventListener("click", resetPassword);
-  setupGoogleSignIn();
 
   document.addEventListener("keydown", e => {
     if (e.key !== "Enter") return;
