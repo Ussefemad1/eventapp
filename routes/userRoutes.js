@@ -1,23 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");          // ← changed
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
 const admin = require("../middleware/admin");
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,        // ← changed
-  secure: false,    // ← changed (STARTTLS upgrades the connection)
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // App Password
-  },
-  requireTLS: true, // ← forces TLS upgrade
-});
+// ─── RESEND SETUP ─────────────────────────────────────────────────────────────
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 function createAuthResponse(user) {
   const token = jwt.sign(
@@ -102,7 +94,6 @@ router.post("/login", async (req, res) => {
 // forgot password
 router.post("/forgot-password", async (req, res) => {
   try {
-
     const { email } = req.body;
 
     if (!email) {
@@ -131,11 +122,11 @@ router.post("/forgot-password", async (req, res) => {
     const resetURL =
       `${process.env.CLIENT_URL}/reset-password/reset-password.html?token=${resetToken}`;
 
-    await transporter.sendMail({
-      from: `Eventify <${process.env.EMAIL_USER}>`,
+    // ─── RESEND SEND ─────────────────────────────────────────────────────────
+    await resend.emails.send({
+      from: `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`, // ← use your verified domain in prod
       to: user.email,
       subject: "Reset Your Eventify Password",
-
       html: `
         <div style="font-family:Arial,sans-serif;padding:24px;background:#f5f7fa;color:#111;">
           <div style="max-width:600px;margin:auto;background:#fff;border-radius:14px;padding:32px;border:1px solid #e5e7eb;">
@@ -183,26 +174,23 @@ router.post("/forgot-password", async (req, res) => {
         </div>
       `,
     });
+    // ──────────────────────────────────────────────────────────────────────────
 
     return res.status(200).json({
       message: "Password reset link sent to your email.",
     });
 
   } catch (err) {
-
     console.error(err);
-
     return res.status(500).json({
       message: "Could not send reset email",
     });
-
   }
 });
 
 // reset password
 router.post("/reset-password", async (req, res) => {
   try {
-
     const { token, newPassword } = req.body;
 
     if (!token || !newPassword) {
@@ -244,13 +232,10 @@ router.post("/reset-password", async (req, res) => {
     });
 
   } catch (err) {
-
     console.error(err);
-
     return res.status(500).json({
       message: "Could not reset password",
     });
-
   }
 });
 
