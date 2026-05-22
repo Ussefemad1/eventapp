@@ -114,11 +114,38 @@ async function loadBookings() {
             <div class="ticket-label">Eventify Ticket</div>
             <h3>${escapeHtml(booking.event)}</h3>
             <div class="ticket-meta">
-              <span>Booking #${String(booking._id).slice(-6).toUpperCase()}</span>
-              <span>Payment: <strong>${escapeHtml(booking.paymentMethod || "-").toUpperCase()}</strong></span>
-              <span>Status: <strong>${escapeHtml(booking.paymentStatus || "-").toUpperCase()}</strong></span>
-              <span>Amount: <strong>${Number(booking.amount || 0).toLocaleString()} EGP</strong></span>
-            </div>
+
+  <span>
+    Booking #${String(booking._id).slice(-6).toUpperCase()}
+  </span>
+
+  <span>
+    Tickets:
+    <strong>${booking.tickets}</strong>
+  </span>
+
+  <span>
+    Payment:
+    <strong>
+      ${escapeHtml(booking.paymentMethod || "-").toUpperCase()}
+    </strong>
+  </span>
+
+  <span>
+    Status:
+    <strong>
+      ${escapeHtml(booking.paymentStatus || "-").toUpperCase()}
+    </strong>
+  </span>
+
+  <span>
+    Amount:
+    <strong>
+      ${Number(booking.amount || 0).toLocaleString()} EGP
+    </strong>
+  </span>
+
+</div>
           </div>
           <div class="ticket-bottom">
             <span class="ticket-status">Confirmed</span>
@@ -135,13 +162,12 @@ async function loadBookings() {
   }
 }
 
-async function cancelBooking(bookingId, eventId) {
+async function cancelBooking(bookingId) {
   try {
     await apiFetch(`/api/bookings/${bookingId}`, { method: "DELETE" });
-    await apiFetch(`/api/events/${eventId}/cancel`, { method: "PUT" });
     await loadBookings();
     showAlert(pageAlert, "Booking cancelled successfully.", "success");
-  } catch (e) {
+  } catch (e) { 
     showAlert(pageAlert, e.message || "Could not cancel booking.");
   }
 }

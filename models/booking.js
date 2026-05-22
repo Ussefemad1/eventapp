@@ -18,6 +18,13 @@ const bookingSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  
+    tickets: {
+  type: Number,
+  required: true,
+  min: 1,
+  default: 1,
+},
 
   paymentMethod: {
     type: String,

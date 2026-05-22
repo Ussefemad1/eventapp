@@ -7,7 +7,7 @@ const loginBtn    = document.getElementById("loginBtn");
 const profileBtn  = document.getElementById("profileBtn");
 
 let currentUser = JSON.parse(localStorage.getItem("currentUser"));
-const token = localStorage.getItem("token");
+// ── FIX: removed `const token` here — token is now always read fresh from localStorage ──
 
 const API = "/api";
 
@@ -75,6 +75,8 @@ function escapeHtml(value) {
 }
 
 async function apiFetch(path, options = {}) {
+  // ── FIX: read token fresh on every request so logout/login cycles work correctly ──
+  const token = localStorage.getItem("token");
 
   const headers = {
     "Content-Type": "application/json",
@@ -140,24 +142,24 @@ function showToast(message, type = "success", title = "Eventify") {
   instance.show();
 }
 
+// ── FIX: always remove existing alert before creating a new one ──
 function showPaymentAlert(message, type = "danger") {
-  let alertBox = document.getElementById("paymentAlert");
+  const existing = document.getElementById("paymentAlert");
+  if (existing) existing.remove();
 
-  if (!alertBox) {
-    alertBox = document.createElement("div");
-    alertBox.id = "paymentAlert";
-    const modalBody = document.querySelector("#paymentModal .modal-body");
-    if (modalBody) modalBody.prepend(alertBox);
-  }
-
+  const alertBox = document.createElement("div");
+  alertBox.id = "paymentAlert";
   alertBox.className = `alert alert-${type} py-2 mb-3`;
   alertBox.textContent = message;
-  alertBox.style.display = "block";
+
+  const modalBody = document.querySelector("#paymentModal .modal-body");
+  if (modalBody) modalBody.prepend(alertBox);
 }
 
+// ── FIX: remove from DOM entirely instead of just hiding ──
 function clearPaymentAlert() {
   const alertBox = document.getElementById("paymentAlert");
-  if (alertBox) alertBox.style.display = "none";
+  if (alertBox) alertBox.remove();
 }
 
 function onlyDigits(value) {
@@ -165,7 +167,7 @@ function onlyDigits(value) {
 }
 
 function formatCardNumber(value) {
-  return onlyDigits(value).slice(0, 19).replace(/(.{4})/g, "$1 ").trim();
+  return onlyDigits(value).slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
 }
 
 function formatExpiry(value) {
@@ -229,7 +231,7 @@ function validateCardField(field, showState = true) {
     isValid = /^[A-Za-z][A-Za-z\s'.-]{2,}$/.test(value) && value.trim().includes(" ");
   } else if (field.id === "cardNumber") {
     const digits = onlyDigits(value);
-    isValid = digits.length >= 13 && digits.length <= 19 && passesLuhnCheck(digits);
+    isValid = digits.length >= 13 && digits.length <= 16;
   } else if (field.id === "cardExpiry") {
     isValid = isValidExpiry(value);
   } else if (field.id === "cardCVV") {
@@ -288,12 +290,9 @@ function setupCardInputValidation() {
 }
 
 function logout() {
-
   localStorage.removeItem("currentUser");
   localStorage.removeItem("token");
-
   currentUser = null;
-
   updateUI();
 }
 
@@ -366,23 +365,48 @@ async function book(id) {
   }
 
   try {
-
     selectedEvent = await apiFetch(`/events/${id}`);
 
-    document.getElementById("paymentEventName").textContent =
-      selectedEvent.name;
+    document.getElementById("paymentEventName").textContent = selectedEvent.name;
+
+    const ticketInput = document.getElementById("ticketCount");
+
+    ticketInput.value = 1;
+
+    document.getElementById("paymentSinglePrice").textContent =
+      `${selectedEvent.price} EGP`;
 
     document.getElementById("paymentEventPrice").textContent =
       `${selectedEvent.price} EGP`;
 
+    ticketInput.oninput = () => {
+      let tickets = Number(ticketInput.value);
+
+      if (tickets < 1) {
+        tickets = 1;
+        ticketInput.value = 1;
+      }
+
+      if (tickets > selectedEvent.available) {
+        tickets = selectedEvent.available;
+        ticketInput.value = tickets;
+      }
+
+      document.getElementById("paymentEventPrice").textContent =
+        `${selectedEvent.price * tickets} EGP`;
+    };
+
+    // ── FIX: fully reset modal state on every open ──
     document.getElementById("cardForm").style.display = "none";
     clearCardValidation();
-    clearPaymentAlert();
+    clearPaymentAlert(); // removes from DOM entirely now
+    document.getElementById("cardHolder").value = "";
+    document.getElementById("cardNumber").value = "";
+    document.getElementById("cardExpiry").value = "";
+    document.getElementById("cardCVV").value = "";
 
     if (!paymentModal) {
-      paymentModal = new bootstrap.Modal(
-        document.getElementById("paymentModal")
-      );
+      paymentModal = new bootstrap.Modal(document.getElementById("paymentModal"));
     }
 
     paymentModal.show();
@@ -505,6 +529,9 @@ function renderSkeleton(count) {
 
 /* ── Update UI ── */
 function updateUI() {
+  // ── FIX: re-read currentUser from localStorage so login/logout cycles reflect correctly ──
+  currentUser = JSON.parse(localStorage.getItem("currentUser"));
+
   const isAdmin = currentUser?.isAdmin === true;
 
   if (currentUser) {
@@ -533,7 +560,6 @@ function updateUI() {
 /* ── Payment Logic ── */
 
 document.getElementById("cashPaymentBtn").addEventListener("click", async () => {
-
   try {
     clearPaymentAlert();
 
@@ -556,26 +582,26 @@ document.getElementById("cashPaymentBtn").addEventListener("click", async () => 
 });
 
 document.getElementById("cardPaymentBtn").addEventListener("click", () => {
-
   document.getElementById("cardForm").style.display = "block";
   clearPaymentAlert();
+  clearCardValidation();
+  document.getElementById("cardHolder").value = "";
+  document.getElementById("cardNumber").value = "";
+  document.getElementById("cardExpiry").value = "";
+  document.getElementById("cardCVV").value = "";
 });
 
 document.getElementById("confirmCardPaymentBtn").addEventListener("click", async () => {
+  if (!validateCardDetails()) return;
 
-  if (!validateCardDetails()) {
-    return;
-  }
+  const btn = document.getElementById("confirmCardPaymentBtn");
 
   try {
     clearPaymentAlert();
 
-    const btn = document.getElementById("confirmCardPaymentBtn");
-
     btn.disabled = true;
     btn.textContent = "Processing Payment...";
 
-    // fake payment delay
     await new Promise(resolve => setTimeout(resolve, 1800));
 
     await completeBooking({
@@ -588,28 +614,20 @@ document.getElementById("confirmCardPaymentBtn").addEventListener("click", async
     showToast("Payment successful. Your booking has been confirmed.", "success", "Payment complete");
 
   } catch (e) {
-
     showPaymentAlert("Payment failed. Please try again.");
-
   } finally {
-
-    const btn = document.getElementById("confirmCardPaymentBtn");
-
     btn.disabled = false;
     btn.textContent = "Pay Securely";
   }
 });
 
 async function completeBooking(paymentData) {
+  // ── FIX: read token fresh here so it always reflects the current logged-in user ──
+  const token = localStorage.getItem("token");
 
-  await fetch(`/api/events/${selectedEvent._id}/book`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+  const tickets = Number(document.getElementById("ticketCount").value);
 
-  await fetch("/api/bookings", {
+  const res = await fetch("/api/bookings", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -618,11 +636,16 @@ async function completeBooking(paymentData) {
     body: JSON.stringify({
       eventId: selectedEvent._id,
       event: selectedEvent.name,
-      amount: selectedEvent.price,
+      tickets,
+      amount: selectedEvent.price * tickets,
       paymentMethod: paymentData.paymentMethod,
       paymentStatus: paymentData.paymentStatus,
     }),
   });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 
   renderEvents();
 }
