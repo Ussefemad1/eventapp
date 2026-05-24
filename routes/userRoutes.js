@@ -11,6 +11,10 @@ const admin = require("../middleware/admin");
 // ─── RESEND SETUP ─────────────────────────────────────────────────────────────
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 function createAuthResponse(user) {
   const token = jwt.sign(
     {
@@ -107,14 +111,14 @@ router.post("/forgot-password", async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({
-        message: "No account found with this email",
+      return res.status(200).json({
+        message: "If an account exists for this email, a password reset link has been sent.",
       });
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
 
-    user.resetPasswordToken = resetToken;
+    user.resetPasswordToken = hashResetToken(resetToken);
     user.resetPasswordExpires = Date.now() + 1000 * 60 * 15;
 
     await user.save();
@@ -177,7 +181,7 @@ router.post("/forgot-password", async (req, res) => {
     // ──────────────────────────────────────────────────────────────────────────
 
     return res.status(200).json({
-      message: "Password reset link sent to your email.",
+      message: "If an account exists for this email, a password reset link has been sent.",
     });
 
   } catch (err) {
@@ -210,7 +214,7 @@ router.post("/reset-password", async (req, res) => {
     }
 
     const user = await User.findOne({
-      resetPasswordToken: token,
+      resetPasswordToken: hashResetToken(token),
       resetPasswordExpires: { $gt: Date.now() },
     });
 
@@ -309,10 +313,19 @@ router.get("/", auth, admin, async (req, res) => {
 
 // edit user (ADMIN ONLY)
 router.put("/:id", auth, admin, async (req, res) => {
+  const allowedUpdates = ["name", "email", "phone", "age", "gender", "isAdmin"];
+  const updates = {};
+
+  for (const field of allowedUpdates) {
+    if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+      updates[field] = req.body[field];
+    }
+  }
+
   const user = await User.findByIdAndUpdate(
     req.params.id,
-    req.body,
-    { returnDocument: "after" }
+    updates,
+    { returnDocument: "after", runValidators: true }
   ).select("-password");
 
   res.json(user);
@@ -329,6 +342,10 @@ router.delete("/:id", auth, admin, async (req, res) => {
 
 // fetch user by id
 router.get("/:id", auth, async (req, res) => {
+  if (!req.user.isAdmin && req.params.id !== req.user.id) {
+    return res.status(403).json({ message: "Unauthorized" });
+  }
+
   const user = await User.findById(req.params.id).select("-password");
   res.json(user);
 });

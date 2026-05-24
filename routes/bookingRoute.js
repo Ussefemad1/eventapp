@@ -69,53 +69,65 @@ router.post("/", auth, async (req, res) => {
 
     const {
       eventId,
-      event,
       tickets,
       paymentMethod,
-      paymentStatus,
-      amount
     } = req.body;
 
-    // find event
-    const existingEvent = await Event.findById(eventId);
-
-    if (!existingEvent) {
-      return res.status(404).json({
-        message: "Event not found"
-      });
-    }
+    const ticketCount = Number(tickets);
 
     // validate tickets
-    if (!tickets || tickets < 1) {
+    if (!Number.isInteger(ticketCount) || ticketCount < 1) {
       return res.status(400).json({
         message: "Invalid number of tickets"
       });
     }
 
-    // check available seats
-    if (existingEvent.available < tickets) {
+    if (!["cash", "card"].includes(paymentMethod)) {
       return res.status(400).json({
-        message: "Not enough available seats"
+        message: "Invalid payment method"
       });
     }
 
-    // decrease available seats
-    existingEvent.available -= tickets;
+    const existingEvent = await Event.findOneAndUpdate(
+      {
+        _id: eventId,
+        available: { $gte: ticketCount }
+      },
+      {
+        $inc: { available: -ticketCount }
+      },
+      {
+        returnDocument: "after"
+      }
+    );
 
-    await existingEvent.save();
+    if (!existingEvent) {
+      const eventExists = await Event.exists({ _id: eventId });
+
+      return res.status(eventExists ? 400 : 404).json({
+        message: eventExists ? "Not enough available seats" : "Event not found"
+      });
+    }
 
     // create booking
     const booking = new Booking({
       user: req.user.email,
       eventId,
-      event,
-      tickets,
+      event: existingEvent.name,
+      tickets: ticketCount,
       paymentMethod,
-      paymentStatus,
-      amount,
+      paymentStatus: paymentMethod === "card" ? "paid" : "pending",
+      amount: existingEvent.price * ticketCount,
     });
 
-    await booking.save();
+    try {
+      await booking.save();
+    } catch (err) {
+      await Event.findByIdAndUpdate(eventId, {
+        $inc: { available: ticketCount }
+      });
+      throw err;
+    }
 
     res.status(201).json(booking);
 
@@ -142,19 +154,29 @@ router.put("/:id", auth, async (req, res) => {
       });
     }
 
-    if (
-      !req.user.isAdmin &&
-      booking.user !== req.user.email
-    ) {
+    if (!req.user.isAdmin) {
       return res.status(403).json({
         message: "Unauthorized"
       });
     }
 
+    const allowedUpdates = ["paymentMethod"];
+    const updates = {};
+
+    for (const field of allowedUpdates) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (updates.paymentMethod) {
+      updates.paymentStatus = updates.paymentMethod === "card" ? "paid" : "pending";
+    }
+
     const updated = await Booking.findByIdAndUpdate(
       req.params.id,
-      req.body,
-      { new: true }
+      updates,
+      { returnDocument: "after", runValidators: true }
     );
 
     res.json(updated);

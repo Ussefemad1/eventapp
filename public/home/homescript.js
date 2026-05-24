@@ -11,59 +11,41 @@ let currentUser = JSON.parse(localStorage.getItem("currentUser"));
 
 const API = "/api";
 
-const CATEGORY_IMAGES = {
-  music: {
-    label: "Music",
-    image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=900&q=80",
-  },
-  football: {
-    label: "Football",
-    image: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=900&q=80",
-  },
-  technology: {
-    label: "Technology",
-    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
-  },
-  business: {
-    label: "Business",
-    image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80",
-  },
-  education: {
-    label: "Education",
-    image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=900&q=80",
-  },
-  food: {
-    label: "Food",
-    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=900&q=80",
-  },
-  art: {
-    label: "Art",
-    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=80",
-  },
-  theater: {
-    label: "Theater",
-    image: "https://images.unsplash.com/photo-1503095396549-807759245b35?auto=format&fit=crop&w=900&q=80",
-  },
-  sports: {
-    label: "Sports",
-    image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=900&q=80",
-  },
-};
-
 const DEFAULT_EVENT_IMAGE =
   "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=900&q=80";
 
-function normalizeCategory(category) {
-  return String(category || "").trim().toLowerCase();
-}
-
-function getCategoryMeta(category) {
-  const key = normalizeCategory(category);
-  return CATEGORY_IMAGES[key] || {
-    label: String(category || "Event").trim() || "Event",
-    image: DEFAULT_EVENT_IMAGE,
-  };
-}
+const CASH_PAYMENT_STORES = [
+  {
+    name: "Eventify Downtown",
+    area: "Tahrir Square",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Tahrir%20Square%20Cairo",
+  },
+  {
+    name: "Eventify Nasr City",
+    area: "City Stars",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=City%20Stars%20Nasr%20City%20Cairo",
+  },
+  {
+    name: "Eventify Zamalek",
+    area: "26 July Street",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=26%20July%20Street%20Zamalek%20Cairo",
+  },
+  {
+    name: "Eventify Maadi",
+    area: "Road 9",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Road%209%20Maadi%20Cairo",
+  },
+  {
+    name: "Eventify New Cairo",
+    area: "Cairo Festival City",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Cairo%20Festival%20City%20New%20Cairo",
+  },
+  {
+    name: "Eventify Heliopolis",
+    area: "Korba",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Korba%20Heliopolis%20Cairo",
+  },
+];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -72,6 +54,15 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not read the selected image."));
+    reader.readAsDataURL(file);
+  });
 }
 
 async function apiFetch(path, options = {}) {
@@ -143,6 +134,40 @@ function showToast(message, type = "success", title = "Eventify") {
 }
 
 // ── FIX: always remove existing alert before creating a new one ──
+function showCashPaymentToast() {
+  const toast = document.createElement("div");
+
+  toast.className = "toast align-items-stretch border-0 text-bg-success";
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "assertive");
+  toast.setAttribute("aria-atomic", "true");
+
+  const storesHtml = CASH_PAYMENT_STORES.map(store => `
+    <li>
+      <a class="link-light fw-semibold" href="${store.mapsUrl}" target="_blank" rel="noopener noreferrer">
+        ${escapeHtml(store.name)}
+      </a>
+      <span class="d-block small opacity-75">${escapeHtml(store.area)}</span>
+    </li>
+  `).join("");
+
+  toast.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">
+        <strong class="d-block mb-1">Booking confirmed</strong>
+        <span>Please pay at one of these Eventify stores within 24 hours:</span>
+        <ol class="mb-0 mt-2 ps-3">${storesHtml}</ol>
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 mt-2" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>`;
+
+  getToastContainer().appendChild(toast);
+
+  const instance = new bootstrap.Toast(toast, { autohide: false });
+  toast.addEventListener("hidden.bs.toast", () => toast.remove());
+  instance.show();
+}
+
 function showPaymentAlert(message, type = "danger") {
   const existing = document.getElementById("paymentAlert");
   if (existing) existing.remove();
@@ -303,9 +328,22 @@ async function addEvent() {
   const evenue = document.getElementById("evenue");
   const eseats = document.getElementById("eseats");
   const eprice = document.getElementById("eprice");
+  const eimage = document.getElementById("eimage");
 
-  if (!ename.value || !ecat.value || !evenue.value || !eseats.value || !eprice.value) {
+  if (!ename.value || !ecat.value || !evenue.value || !eseats.value || !eprice.value || !eimage.files.length) {
     showAdminMsg("Please fill in all fields before creating an event.", "error");
+    return;
+  }
+
+  const imageFile = eimage.files[0];
+
+  if (!imageFile.type.startsWith("image/")) {
+    showAdminMsg("Please upload a valid image file.", "error");
+    return;
+  }
+
+  if (imageFile.size > 5 * 1024 * 1024) {
+    showAdminMsg("Please upload an image smaller than 5 MB.", "error");
     return;
   }
 
@@ -313,19 +351,22 @@ async function addEvent() {
   if (btn) { btn.disabled = true; btn.textContent = "Creating…"; }
 
   try {
+    const image = await readImageAsDataUrl(imageFile);
+
     await apiFetch("/events", {
       method: "POST",
       body: JSON.stringify({
         name:      ename.value,
         category:  ecat.value,
         venue:     evenue.value,
+        image,
         seats:     Number(eseats.value),
         price:     Number(eprice.value),
         available: Number(eseats.value),
       }),
     });
 
-    ename.value = ecat.value = evenue.value = eseats.value = eprice.value = "";
+    ename.value = ecat.value = evenue.value = eseats.value = eprice.value = eimage.value = "";
     showAdminMsg("Event created successfully!", "success");
     renderEvents();
 
@@ -374,10 +415,10 @@ async function book(id) {
     ticketInput.value = 1;
 
     document.getElementById("paymentSinglePrice").textContent =
-      `${selectedEvent.price} EGP`;
+      `${selectedEvent.price} LE`;
 
     document.getElementById("paymentEventPrice").textContent =
-      `${selectedEvent.price} EGP`;
+      `${selectedEvent.price} LE`;
 
     ticketInput.oninput = () => {
       let tickets = Number(ticketInput.value);
@@ -393,7 +434,7 @@ async function book(id) {
       }
 
       document.getElementById("paymentEventPrice").textContent =
-        `${selectedEvent.price * tickets} EGP`;
+        `${selectedEvent.price * tickets} LE`;
     };
 
     // ── FIX: fully reset modal state on every open ──
@@ -451,7 +492,8 @@ async function renderEvents() {
     eventsDiv.innerHTML = events.map(e => {
       const soldOut = e.available <= 0;
       const low     = e.available > 0 && e.available <= 10;
-      const category = getCategoryMeta(e.category);
+      const categoryLabel = String(e.category || "Event").trim() || "Event";
+      const eventImage = e.image || DEFAULT_EVENT_IMAGE;
       const eventName = escapeHtml(e.name);
       const eventVenue = escapeHtml(e.venue);
 
@@ -476,13 +518,13 @@ async function renderEvents() {
             <div class="ev-card-image-wrap">
               <img
                 class="ev-card-image"
-                src="${category.image}"
-                alt="${escapeHtml(category.label)} event image"
+                src="${escapeHtml(eventImage)}"
+                alt="${eventName} event image"
                 loading="lazy"
               >
             </div>
             <div class="ev-card-body d-flex flex-column flex-grow-1">
-              <span class="ev-card-chip">${escapeHtml(category.label)}</span>
+              <span class="ev-card-chip">${escapeHtml(categoryLabel)}</span>
               <h3 class="ev-card-title">${eventName}</h3>
               <div class="ev-card-meta">
                 <div class="ev-meta-row">
@@ -497,7 +539,7 @@ async function renderEvents() {
               <div class="ev-card-footer mt-auto">
                 <div>
                   <div class="ev-price-label">Price</div>
-                  <div class="ev-price">${e.price === 0 ? "Free" : "$" + Number(e.price).toLocaleString()}</div>
+                  <div class="ev-price">${e.price === 0 ? "Free" : Number(e.price).toLocaleString() + " LE"}</div>
                 </div>
                 ${actionBtn}
               </div>
@@ -570,11 +612,7 @@ document.getElementById("cashPaymentBtn").addEventListener("click", async () => 
 
     paymentModal.hide();
 
-    showToast(
-      "Booking confirmed. Please visit the nearest Eventify store within 24 hours to complete payment.",
-      "success",
-      "Booking confirmed"
-    );
+    showCashPaymentToast();
 
   } catch (e) {
     showToast("Booking failed. Please try again.", "danger", "Booking failed");

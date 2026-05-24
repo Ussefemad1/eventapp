@@ -59,7 +59,23 @@ router.post("/", auth, async (req, res) => {
       });
     }
 
-    const event = new Event(req.body);
+    const { name, category, venue, image, seats, price, available } = req.body;
+
+    if (!image || !String(image).startsWith("data:image/")) {
+      return res.status(400).json({
+        message: "Event image is required"
+      });
+    }
+
+    const event = new Event({
+      name,
+      category,
+      venue,
+      image,
+      seats,
+      price,
+      available
+    });
 
     await event.save();
 
@@ -86,10 +102,25 @@ router.put("/:id", auth, async (req, res) => {
       });
     }
 
+    if (req.body.image && !String(req.body.image).startsWith("data:image/")) {
+      return res.status(400).json({
+        message: "Event image must be a valid image upload"
+      });
+    }
+
+    const allowedUpdates = ["name", "category", "venue", "image", "seats", "price", "available"];
+    const updates = {};
+
+    for (const field of allowedUpdates) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        updates[field] = req.body[field];
+      }
+    }
+
     const event = await Event.findByIdAndUpdate(
       req.params.id,
-      req.body,
-      { new: true }
+      updates,
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!event) {
