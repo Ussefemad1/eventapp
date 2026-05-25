@@ -248,6 +248,14 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+.ev-filter-panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+}
+
 /* ── Inputs ── */
 .ev-input-wrap { display: flex; flex-direction: column; gap: 6px; }
 
@@ -275,6 +283,20 @@ body {
   outline: none !important;
 }
 .ev-input::placeholder { color: #aab8b2 !important; }
+
+.ev-btn-filter {
+  background: var(--green-light);
+  color: var(--green-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  padding: 11px 15px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.ev-btn-filter:hover {
+  background: #d9eee2;
+  color: var(--green-deep);
+}
 
 /* ── Event Cards ── */
 .ev-event-card {
@@ -361,6 +383,16 @@ body {
   gap: 8px;
   font-size: 0.855rem;
   color: var(--text-mid);
+}
+
+.ev-location-link {
+  color: var(--green-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ev-location-link:hover {
+  color: var(--green-deep);
+  text-decoration: underline;
 }
 
 .ev-meta-icon {
@@ -598,6 +630,21 @@ body {
 }
 
 /* ── Admin Delete Button ── */
+.ev-admin-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: end;
+}
+
+.ev-btn-edit {
+  background: #2563eb !important;
+}
+.ev-btn-edit:hover {
+  background: #1d4ed8 !important;
+  box-shadow: 0 4px 14px rgba(37,99,235,0.3) !important;
+}
+
 .ev-btn-delete {
   background: #b91c1c !important;
 }
@@ -609,6 +656,7 @@ body {
 /* ── Responsive ── */
 @media (max-width: 576px) {
   .ev-admin-panel { padding: 22px 18px; }
+  .ev-filter-panel { padding: 16px; }
   .ev-hero { padding: 36px 0 30px; }
   .ev-hero-badge { display: none; }
   .ev-card-body { padding: 20px 18px 16px; }

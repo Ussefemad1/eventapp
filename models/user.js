@@ -42,6 +42,11 @@ const userSchema = new mongoose.Schema({
     trim: true,
   },
 
+  favoriteEvents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Event",
+  }],
+
   password: {
     type: String,
     required: true,

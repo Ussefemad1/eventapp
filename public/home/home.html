@@ -102,7 +102,6 @@
       <div class="col-md-6">
         <div class="ev-input-wrap">
           <label class="ev-label">Event Name</label>
-
           <input
             id="ename"
             class="form-control ev-input"
@@ -113,9 +112,7 @@
 
       <div class="col-md-6">
         <div class="ev-input-wrap">
-
           <label class="ev-label">Category</label>
-
           <select id="ecat" class="form-select ev-input">
             <option value="">Choose a category</option>
             <option value="Music">Music</option>
@@ -128,73 +125,95 @@
             <option value="Theater">Theater</option>
             <option value="Sports">Sports</option>
           </select>
-
         </div>
       </div>
 
       <div class="col-md-6">
         <div class="ev-input-wrap">
-
           <label class="ev-label">Venue</label>
-
           <input
             id="evenue"
             class="form-control ev-input"
             placeholder="e.g. Cairo Convention Center"
           />
-
         </div>
       </div>
 
       <div class="col-md-6">
         <div class="ev-input-wrap">
+          <label class="ev-label">Google Maps Link</label>
+          <input
+            id="elocationUrl"
+            type="url"
+            class="form-control ev-input"
+            placeholder="https://maps.google.com/..."
+          />
+        </div>
+      </div>
 
+      <div class="col-md-6">
+        <div class="ev-input-wrap">
           <label class="ev-label">Event Picture</label>
-
           <input
             id="eimage"
             type="file"
             accept="image/*"
             class="form-control ev-input"
           />
-
         </div>
       </div>
 
+      <!-- Total Seats only — available is auto-set to seats value -->
       <div class="col-md-3">
         <div class="ev-input-wrap">
-
-          <label class="ev-label">Available Seats</label>
-
+          <label class="ev-label">Total Seats</label>
           <input
             id="eseats"
             type="number"
             class="form-control ev-input"
             placeholder="100"
           />
-
         </div>
       </div>
 
       <div class="col-md-3">
         <div class="ev-input-wrap">
-
           <label class="ev-label">Price (LE)</label>
-
           <input
             id="eprice"
             type="number"
             class="form-control ev-input"
             placeholder="0"
           />
+        </div>
+      </div>
 
+      <div class="col-md-6">
+        <div class="ev-input-wrap">
+          <label class="ev-label">Start Date</label>
+          <input
+            id="estartDate"
+            type="datetime-local"
+            class="form-control ev-input"
+          />
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="ev-input-wrap">
+          <label class="ev-label">Status</label>
+          <select id="estatus" class="form-select ev-input">
+            <option value="upcoming">Upcoming</option>
+            <option value="draft">Draft</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
       </div>
 
     </div>
 
     <div class="mt-4">
-
       <button
         id="createEventBtn"
         onclick="addEvent()"
@@ -202,20 +221,81 @@
       >
         Create Event
       </button>
-
     </div>
 
   </div>
 
   <!-- Events -->
   <div class="ev-section-header mb-4">
-
     <h2 class="ev-section-title mb-0">Upcoming Events</h2>
+    <span class="ev-count" id="eventsCount">0 events</span>
+  </div>
 
-    <span class="ev-count" id="eventsCount">
-      0 events
-    </span>
+  <div class="ev-filter-panel mb-4">
+    <div class="row g-3 align-items-end">
 
+      <div class="col-lg-4 col-md-6">
+        <div class="ev-input-wrap">
+          <label class="ev-label">Search by Name</label>
+          <input
+            id="filterName"
+            class="form-control ev-input"
+            placeholder="Search events"
+          />
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="ev-input-wrap">
+          <label class="ev-label">Category</label>
+          <select id="filterCategory" class="form-select ev-input">
+            <option value="">All categories</option>
+            <option value="Music">Music</option>
+            <option value="Football">Football</option>
+            <option value="Technology">Technology</option>
+            <option value="Business">Business</option>
+            <option value="Education">Education</option>
+            <option value="Food">Food</option>
+            <option value="Art">Art</option>
+            <option value="Theater">Theater</option>
+            <option value="Sports">Sports</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="col-lg-2 col-md-4">
+        <div class="ev-input-wrap">
+          <label class="ev-label">Min Price</label>
+          <input
+            id="filterMinPrice"
+            type="number"
+            min="0"
+            class="form-control ev-input"
+            placeholder="0"
+          />
+        </div>
+      </div>
+
+      <div class="col-lg-2 col-md-4">
+        <div class="ev-input-wrap">
+          <label class="ev-label">Max Price</label>
+          <input
+            id="filterMaxPrice"
+            type="number"
+            min="0"
+            class="form-control ev-input"
+            placeholder="Any"
+          />
+        </div>
+      </div>
+
+      <div class="col-lg-1 col-md-4 d-grid">
+        <button id="clearFiltersBtn" class="btn ev-btn-filter" type="button">
+          Clear
+        </button>
+      </div>
+
+    </div>
   </div>
 
   <div id="events" class="row g-4 mb-2"></div>
@@ -237,15 +317,8 @@
       <div class="modal-header border-0 pb-0">
 
         <div>
-
-          <h5 class="modal-title ev-payment-title">
-            Complete Booking
-          </h5>
-
-          <p class="ev-payment-subtitle mb-0">
-            Choose your preferred payment method.
-          </p>
-
+          <h5 class="modal-title ev-payment-title">Complete Booking</h5>
+          <p class="ev-payment-subtitle mb-0">Choose your preferred payment method.</p>
         </div>
 
         <button
@@ -263,38 +336,24 @@
 
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="ev-payment-label">Event</span>
-
             <span id="paymentEventName" class="fw-semibold"></span>
           </div>
 
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="ev-payment-label">Price Per Ticket</span>
-
             <span id="paymentSinglePrice" class="fw-semibold"></span>
           </div>
 
           <div class="d-flex justify-content-between align-items-center">
-
-            <span class="ev-payment-label">
-              Total Amount
-            </span>
-
-            <span
-              id="paymentEventPrice"
-              class="ev-payment-price"
-            ></span>
-
+            <span class="ev-payment-label">Total Amount</span>
+            <span id="paymentEventPrice" class="ev-payment-price"></span>
           </div>
 
         </div>
 
         <!-- Number of Tickets -->
         <div class="mb-4">
-
-          <label class="ev-label">
-            Number of Tickets
-          </label>
-
+          <label class="ev-label">Number of Tickets</label>
           <input
             type="number"
             id="ticketCount"
@@ -302,11 +361,7 @@
             min="1"
             value="1"
           />
-
-          <small class="text-muted">
-            Select how many tickets you want to book
-          </small>
-
+          <small class="text-muted">Select how many tickets you want to book</small>
         </div>
 
         <!-- Payment Methods -->
@@ -314,60 +369,30 @@
 
           <!-- Cash -->
           <button id="cashPaymentBtn" class="btn ev-payment-method">
-
             <div class="d-flex align-items-center justify-content-between w-100">
-
               <div class="d-flex align-items-center gap-3">
-
                 <div class="ev-payment-icon">💵</div>
-
                 <div class="text-start">
-
-                  <div class="fw-semibold">
-                    Cash Payment
-                  </div>
-
-                  <div class="ev-payment-small">
-                    Pay at the nearest Eventify store
-                  </div>
-
+                  <div class="fw-semibold">Cash Payment</div>
+                  <div class="ev-payment-small">Pay at the nearest Eventify store</div>
                 </div>
-
               </div>
-
               <span class="ev-payment-arrow">→</span>
-
             </div>
-
           </button>
 
           <!-- Card -->
           <button id="cardPaymentBtn" class="btn ev-payment-method">
-
             <div class="d-flex align-items-center justify-content-between w-100">
-
               <div class="d-flex align-items-center gap-3">
-
                 <div class="ev-payment-icon">💳</div>
-
                 <div class="text-start">
-
-                  <div class="fw-semibold">
-                    Credit Card
-                  </div>
-
-                  <div class="ev-payment-small">
-                    Secure online payment
-                  </div>
-
+                  <div class="fw-semibold">Credit Card</div>
+                  <div class="ev-payment-small">Secure online payment</div>
                 </div>
-
               </div>
-
               <span class="ev-payment-arrow">→</span>
-
             </div>
-
           </button>
 
         </div>
@@ -376,65 +401,45 @@
         <div id="cardForm" class="mt-4" style="display:none;">
 
           <div class="mb-3">
-
-            <label class="ev-label">
-              Card Holder
-            </label>
-
+            <label class="ev-label">Card Holder</label>
             <input
               type="text"
               id="cardHolder"
               class="form-control ev-input"
               placeholder="John Doe"
             />
-
           </div>
 
           <div class="mb-3">
-
-            <label class="ev-label">
-              Card Number
-            </label>
-
+            <label class="ev-label">Card Number</label>
             <input
               type="text"
               id="cardNumber"
               class="form-control ev-input"
               placeholder="4242 4242 4242 4242"
             />
-
           </div>
 
           <div class="row">
 
             <div class="col-6">
-
-              <label class="ev-label">
-                Expiry
-              </label>
-
+              <label class="ev-label">Expiry</label>
               <input
                 type="text"
                 id="cardExpiry"
                 class="form-control ev-input"
                 placeholder="12/28"
               />
-
             </div>
 
             <div class="col-6">
-
-              <label class="ev-label">
-                CVV
-              </label>
-
+              <label class="ev-label">CVV</label>
               <input
                 type="text"
                 id="cardCVV"
                 class="form-control ev-input"
                 placeholder="123"
               />
-
             </div>
 
           </div>

@@ -19,8 +19,23 @@ const eventSchema = new mongoose.Schema({
     trim: true,
   },
 
+  locationUrl: {
+    type: String,
+    trim: true,
+  },
+
   image: {
     type: String,
+  },
+
+  startDate: {
+    type: Date,
+  },
+
+  status: {
+    type: String,
+    enum: ["draft", "upcoming", "completed", "cancelled"],
+    default: "upcoming",
   },
 
   price: {
@@ -40,6 +55,12 @@ const eventSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
+});
+
+eventSchema.pre("validate", function () {
+  if (this.available > this.seats) {
+    this.available = this.seats;
+  }
 });
 
 module.exports = mongoose.model("Event", eventSchema);
