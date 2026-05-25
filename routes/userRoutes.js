@@ -1,7 +1,7 @@
 const express = require("express");
 const router  = express.Router();
 const crypto  = require("crypto");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 const User    = require("../models/user");
 const Event   = require("../models/event");
 const Booking = require("../models/booking");
@@ -10,18 +10,24 @@ const jwt     = require("jsonwebtoken");
 const auth    = require("../middleware/auth");
 const admin   = require("../middleware/admin");
 
-// ─── RESEND SETUP ─────────────────────────────────────────────────────────────
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
+// ─── NODEMAILER SETUP ─────────────────────────────────────────────────────────
+const transporter = (process.env.GMAIL_USER && process.env.GMAIL_APP_PASS)
+  ? nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASS,
+      },
+    })
   : null;
 
 async function sendPasswordChangedEmail(user) {
-  if (!resend) return;
+  if (!transporter) return;
 
   try {
-    await resend.emails.send({
-      from: `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
-      to: user.email,
+    await transporter.sendMail({
+      from:    `Eventify <${process.env.GMAIL_USER}>`,
+      to:      user.email,
       subject: "Your Eventify password was changed",
       html: `
         <div style="font-family:Arial,sans-serif;padding:24px;background:#f5f7fa;color:#111;">
@@ -39,7 +45,6 @@ async function sendPasswordChangedEmail(user) {
     console.error("Could not send password changed email:", err.message);
   }
 }
-
 
 function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -150,8 +155,15 @@ router.post("/forgot-password", async (req, res) => {
 
     const resetURL = `${process.env.CLIENT_URL}/reset-password/reset-password.html?token=${resetToken}`;
 
-    await resend.emails.send({
-      from:    `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
+    if (!transporter) {
+      console.warn("Email transporter not configured — skipping password reset email");
+      return res.status(200).json({
+        message: "If an account exists for this email, a password reset link has been sent.",
+      });
+    }
+
+    await transporter.sendMail({
+      from:    `Eventify <${process.env.GMAIL_USER}>`,
       to:      user.email,
       subject: "Reset Your Eventify Password",
       html: `

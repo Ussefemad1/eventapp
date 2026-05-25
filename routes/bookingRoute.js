@@ -4,10 +4,16 @@ const QRCode  = require("qrcode");
 const Booking = require("../models/booking");
 const Event   = require("../models/event");
 const auth    = require("../middleware/auth");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
+const transporter = (process.env.GMAIL_USER && process.env.GMAIL_APP_PASS)
+  ? nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASS,
+      },
+    })
   : null;
 
 function canCancelEvent(event) {
@@ -33,10 +39,9 @@ function formatAmount(amount) {
 
 // ─── QR CODE BOOKING CONFIRMATION EMAIL ───────────────────────────────────────
 async function sendBookingConfirmation(booking, event) {
-  if (!resend) return;
+  if (!transporter) return;
 
   try {
-    // Build the QR code data — a compact JSON string the scanner can read
     const qrData = JSON.stringify({
       bookingId:     String(booking._id),
       event:         booking.event,
@@ -46,30 +51,28 @@ async function sendBookingConfirmation(booking, event) {
       paymentStatus: booking.paymentStatus,
     });
 
-    // Generate QR code as a base64 data URL (inline PNG, no external hosting needed)
     const qrDataUrl = await QRCode.toDataURL(qrData, {
-      width:          280,
-      margin:         2,
+      width:  280,
+      margin: 2,
       color: {
-        dark:  "#0d3d22",   // dark green dots matching Eventify brand
+        dark:  "#0d3d22",
         light: "#ffffff",
       },
     });
 
-    // Strip the "data:image/png;base64," prefix — Resend needs raw base64
     const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
-
     const bookingRef = String(booking._id).slice(-6).toUpperCase();
 
-    await resend.emails.send({
-      from:        `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
-      to:          booking.user,
-      subject:     `Your ticket for ${booking.event} — Booking #${bookingRef}`,
+    await transporter.sendMail({
+      from:    `Eventify <${process.env.GMAIL_USER}>`,
+      to:      booking.user,
+      subject: `Your ticket for ${booking.event} — Booking #${bookingRef}`,
       attachments: [
         {
           filename:    `eventify-ticket-${bookingRef}.png`,
-          content:     qrBase64,
+          content:     Buffer.from(qrBase64, "base64"),
           contentType: "image/png",
+          cid:         `qr-${bookingRef}`,
         },
       ],
       html: `
@@ -140,7 +143,6 @@ async function sendBookingConfirmation(booking, event) {
         <p style="margin:0 0 6px;color:rgba(255,255,255,0.55);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;">Scan at Entrance</p>
         <p style="margin:0 0 20px;color:#ffffff;font-size:16px;font-weight:700;">Your Eventify Ticket</p>
 
-        <!-- Inline QR code image (attached as PNG, embedded via cid) -->
         <img
           src="cid:qr-${bookingRef}"
           alt="QR Code for Booking #${bookingRef}"
@@ -182,14 +184,14 @@ async function sendBookingConfirmation(booking, event) {
 
 // ─── BOOKING CANCELLATION EMAIL ───────────────────────────────────────────────
 async function sendCancellationEmail(booking, event) {
-  if (!resend) return;
+  if (!transporter) return;
 
   try {
     const bookingRef = String(booking._id).slice(-6).toUpperCase();
     const isRefunded = booking.paymentStatus === "refunded";
 
-    await resend.emails.send({
-      from:    `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
+    await transporter.sendMail({
+      from:    `Eventify <${process.env.GMAIL_USER}>`,
       to:      booking.user,
       subject: `Booking cancelled — ${booking.event} #${bookingRef}`,
       html: `
