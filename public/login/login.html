@@ -2,31 +2,19 @@
 <html lang="en">
 
 <head>
-
-  <meta charset="UTF-8"/>
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login — Eventify</title>
 
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
-
   <link
-    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap"
     rel="stylesheet"
   />
-
-  <link
-    rel="stylesheet"
-    href="/login/loginstyle.css"
-  />
-
+  <link rel="stylesheet" href="/login/loginstyle.css" />
 </head>
 
 <body>
@@ -35,7 +23,6 @@
 
   <!-- Left Panel -->
   <div class="auth-left d-none d-lg-flex">
-
     <div class="auth-left-inner">
 
       <a href="../home/home.html" class="ev-brand">
@@ -43,14 +30,16 @@
       </a>
 
       <div class="auth-tagline">
-        <h2>
-          Discover & book<br/>
-          unforgettable events.
-        </h2>
+        <h2>Discover &amp; book<br/><em>unforgettable</em> events.</h2>
+        <p>Thousands of experiences are waiting — concerts, workshops, and nights you'll never forget.</p>
+      </div>
 
-        <p>
-          Thousands of experiences waiting for you.
-        </p>
+      <div class="auth-proof">
+        <div class="auth-stats">
+          <div class="stat"><strong>12k+</strong><span>events hosted</span></div>
+          <div class="stat"><strong>250k+</strong><span>happy guests</span></div>
+          <div class="stat"><strong>4.9</strong><span>avg. rating</span></div>
+        </div>
       </div>
 
       <div class="auth-decor-circles">
@@ -60,218 +49,139 @@
       </div>
 
     </div>
-
   </div>
 
   <!-- Right Panel -->
   <div class="auth-right">
-
     <div class="auth-form-wrap">
 
-      <a
-        href="../home/home.html"
-        class="ev-brand d-lg-none mb-5 d-inline-flex"
-      >
+      <a href="../home/home.html" class="ev-brand d-lg-none mb-5 d-inline-flex">
         <span class="brand-dot"></span>Eventify
       </a>
 
       <div class="auth-form-header">
-
-        <h1 class="auth-title">
-          Welcome back
-        </h1>
-
-        <p class="auth-subtitle">
-          Sign in to your account to continue.
-        </p>
-
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to your account to continue.</p>
       </div>
 
-      <div
-        id="errorMsg"
-        class="auth-error"
-        style="display:none;"
-      ></div>
+      <div id="errorMsg" class="auth-error" style="display:none;"></div>
+      <div id="successMsg" class="auth-success" style="display:none;"></div>
 
-      <div
-        id="successMsg"
-        class="auth-success"
-        style="display:none;"
-      ></div>
-
+      <!-- Email -->
       <div class="mb-4">
-
-        <label class="auth-label">
-          Email Address
-        </label>
-
-        <input
-          id="email"
-          type="email"
-          class="form-control auth-input"
-          placeholder="you@example.com"
-        />
-
+        <label class="auth-label" for="email">Email Address</label>
+        <div class="field">
+          <span class="field-icon">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5v-9z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="m4 7 8 6 8-6"/>
+            </svg>
+          </span>
+          <input id="email" type="email" class="form-control auth-input" placeholder="you@example.com" autocomplete="email" />
+        </div>
       </div>
 
+      <!-- Password -->
       <div class="mb-4">
-
-        <div class="d-flex justify-content-between align-items-center mb-1">
-
-          <label class="auth-label">
-            Password
-          </label>
-
-          <button
-            type="button"
-            class="auth-link auth-link-button"
-            data-bs-toggle="modal"
-            data-bs-target="#forgotPasswordModal"
-          >
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="auth-label mb-0" for="password">Password</label>
+          <button type="button" class="auth-link auth-link-button"
+                  data-bs-toggle="modal" data-bs-target="#forgotPasswordModal">
             Forgot password?
           </button>
-
         </div>
-
-        <input
-          id="password"
-          type="password"
-          class="form-control auth-input"
-          placeholder="••••••••"
-        />
-
+        <div class="field has-toggle">
+          <span class="field-icon">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <rect x="4" y="11" width="16" height="9" rx="2"/>
+              <path stroke-linecap="round" d="M8 11V8a4 4 0 0 1 8 0v3"/>
+            </svg>
+          </span>
+          <input id="password" type="password" class="form-control auth-input" placeholder="••••••••" autocomplete="current-password" />
+          <button type="button" class="pw-toggle" aria-label="Show password"
+                  onclick="togglePassword(this, 'password')">
+            <svg class="eye-on" width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="eye-off" width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.8 2.8M9.4 5.6A9.5 9.5 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.9 3.5M6.1 6.7A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 2.6-.4"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <button
-        onclick="login()"
-        class="btn auth-btn-primary w-100 mb-4"
-      >
-
+      <!-- Submit -->
+      <button onclick="login()" class="btn auth-btn-primary w-100 mb-4">
         Sign In
-
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-          style="margin-left:8px;vertical-align:-2px"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M14 5l7 7m0 0l-7 7m7-7H3"
-          />
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
         </svg>
-
       </button>
-      
+
       <p class="auth-switch">
-
         Don't have an account?
-
-        <a
-          href="../register/register.html"
-          class="auth-link"
-        >
-          Create one free
-        </a>
-
+        <a href="../register/register.html" class="auth-link">Create one free</a>
       </p>
 
     </div>
-
   </div>
 
 </div>
 
 <!-- Forgot Password Modal -->
-
-<div
-  class="modal fade"
-  id="forgotPasswordModal"
-  tabindex="-1"
-  aria-hidden="true"
->
-
+<div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-
     <div class="modal-content forgot-modal">
 
       <div class="modal-header border-0 pb-0">
-
         <div>
-
-          <h5 class="modal-title forgot-title">
-            Reset Password
-          </h5>
-
-          <p class="forgot-subtitle mb-0">
-            Enter your account email to receive a secure password reset link.
-          </p>
-
+          <h5 class="modal-title forgot-title">Reset Password</h5>
+          <p class="forgot-subtitle mb-0">Enter your account email to receive a secure password reset link.</p>
         </div>
-
-        <button
-          type="button"
-          class="btn-close"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
-
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
 
       <div class="modal-body">
-
-        <div
-          id="forgotMsg"
-          class="auth-error"
-          style="display:none;"
-        ></div>
-
-        <div
-          id="successMsg"
-          class="auth-success"
-          style="display:none;"
-        ></div>
+        <div id="forgotMsg" class="auth-error" style="display:none;"></div>
 
         <div class="mb-4">
-
-          <label class="auth-label">
-            Email Address
-          </label>
-
-          <input
-            id="forgotEmail"
-            type="email"
-            class="form-control auth-input"
-            placeholder="you@example.com"
-          />
-
+          <label class="auth-label" for="forgotEmail">Email Address</label>
+          <div class="field">
+            <span class="field-icon">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5v-9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4 7 8 6 8-6"/>
+              </svg>
+            </span>
+            <input id="forgotEmail" type="email" class="form-control auth-input" placeholder="you@example.com" />
+          </div>
         </div>
 
-        <button
-          id="resetPasswordBtn"
-          type="button"
-          class="btn auth-btn-primary w-100"
-        >
+        <button id="resetPasswordBtn" type="button" class="btn auth-btn-primary w-100">
           Send Reset Link
         </button>
-
       </div>
 
     </div>
-
   </div>
-
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+<!-- password show/hide toggle (no dependency on loginscript.js) -->
+<script>
+  function togglePassword(btn, inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    btn.classList.toggle("is-on", show);
+    btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  }
+</script>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/login/loginscript.js"></script>
 
 </body>
-
 </html>
