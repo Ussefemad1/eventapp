@@ -4,6 +4,8 @@ const QRCode  = require("qrcode");
 const Booking = require("../models/booking");
 const Event   = require("../models/event");
 const auth    = require("../middleware/auth");
+const jwt     = require("jsonwebtoken");
+const User    = require("../models/user");
 const { Resend } = require("resend");
 
 const resend = process.env.RESEND_API_KEY
@@ -36,18 +38,19 @@ async function sendBookingConfirmation(booking, event) {
   if (!resend) return;
 
   try {
-    // Build the QR code data — a compact JSON string the scanner can read
-    const qrData = JSON.stringify({
-      bookingId:     String(booking._id),
-      event:         booking.event,
-      tickets:       booking.tickets,
-      amount:        booking.amount,
-      paymentMethod: booking.paymentMethod,
-      paymentStatus: booking.paymentStatus,
-    });
+    // The QR encodes a link to a public ticket page. Scanning it opens the page
+    // in a phone browser and shows the holder + event details and live status.
+    // The token is a signed JWT, so the link can't be guessed or tampered with.
+    const ticketToken = jwt.sign(
+      { bookingId: String(booking._id), purpose: "ticket" },
+      process.env.JWT_SECRET,
+      { expiresIn: "60d" }
+    );
+    const baseUrl   = (process.env.CLIENT_URL || "").replace(/\/+$/, "");
+    const ticketUrl = `${baseUrl}/api/bookings/verify/${ticketToken}`;
 
     // Generate QR code as a base64 data URL (inline PNG, no external hosting needed)
-    const qrDataUrl = await QRCode.toDataURL(qrData, {
+    const qrDataUrl = await QRCode.toDataURL(ticketUrl, {
       width:          280,
       margin:         2,
       color: {
@@ -65,14 +68,14 @@ async function sendBookingConfirmation(booking, event) {
       from:        `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
       to:          booking.user,
       subject:     `Your ticket for ${booking.event} — Booking #${bookingRef}`,
-    attachments: [
-  {
-    filename:    `eventify-ticket-${bookingRef}.png`,
-    content:     qrBase64,
-    contentType: "image/png",
-    contentId:   `qr-${bookingRef}`,   // ← add this; matches src="cid:qr-${bookingRef}"
-  },
-],
+      attachments: [
+        {
+          filename:    `eventify-ticket-${bookingRef}.png`,
+          content:     qrBase64,
+          contentType: "image/png",
+          contentId:   `qr-${bookingRef}`,
+        },
+      ],
       html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -294,6 +297,136 @@ async function sendCancellationEmail(booking, event) {
     console.error("Could not send cancellation email:", err.message);
   }
 }
+
+// ─── PUBLIC TICKET PAGE (opened by scanning the QR) ──────────────────────────
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderTicketShell(innerHtml) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Eventify Ticket</title>
+</head>
+<body style="margin:0;padding:24px 16px;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;color:#111c17;">
+  <div style="max-width:480px;margin:0 auto;">
+    ${innerHtml}
+    <p style="text-align:center;color:#7a9186;font-size:12px;margin-top:24px;">
+      Issued by <strong style="color:#1d7a46;">Eventify</strong>. Present this page at the entrance.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+function renderTicketMessage(title, message, color) {
+  return renderTicketShell(`
+    <div style="background:#fff;border:1px solid #e0ebe5;border-radius:18px;padding:36px;text-align:center;">
+      <h1 style="margin:0 0 10px;color:${color};font-size:22px;font-weight:700;">${escapeHtml(title)}</h1>
+      <p style="margin:0;color:#7a9186;font-size:14px;">${escapeHtml(message)}</p>
+    </div>`);
+}
+
+function renderTicketPage({ booking, event, user }) {
+  const bookingRef  = String(booking._id).slice(-6).toUpperCase();
+  const isCancelled = booking.bookingStatus === "cancelled";
+
+  const statusBadge = isCancelled
+    ? `<span style="background:#fee2e2;color:#b91c1c;font-size:13px;font-weight:700;padding:5px 14px;border-radius:999px;">CANCELLED</span>`
+    : `<span style="background:#dcfce7;color:#15803d;font-size:13px;font-weight:700;padding:5px 14px;border-radius:999px;">VALID</span>`;
+
+  const row = (label, value) => value
+    ? `<tr>
+         <td style="padding:10px 0;color:#7a9186;font-size:13px;border-top:1px solid #eef3f0;width:130px;">${escapeHtml(label)}</td>
+         <td style="padding:10px 0;color:#111c17;font-size:14px;font-weight:700;border-top:1px solid #eef3f0;">${escapeHtml(value)}</td>
+       </tr>`
+    : "";
+
+  const dateStr = event && event.startDate ? formatDate(event.startDate) : "Date TBA";
+
+  return renderTicketShell(`
+    <div style="background:linear-gradient(135deg,#0d3d22 0%,#1a6639 100%);border-radius:18px 18px 0 0;padding:28px 32px;">
+      <p style="margin:0 0 4px;color:rgba(255,255,255,0.55);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;">Eventify Ticket</p>
+      <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">${escapeHtml(booking.event)}</h1>
+      <div style="margin-top:14px;">${statusBadge}</div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e0ebe5;border-top:none;border-radius:0 0 18px 18px;padding:28px 32px;">
+
+      <p style="margin:0 0 6px;color:#7a9186;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">Ticket Holder</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:22px;">
+        ${row("Name",  user && user.name)}
+        ${row("Email", (user && user.email) || booking.user)}
+        ${row("Phone", user && user.phone)}
+      </table>
+
+      <p style="margin:0 0 6px;color:#7a9186;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">Event &amp; Booking</p>
+      <table style="width:100%;border-collapse:collapse;">
+        ${row("Date & Time", dateStr)}
+        ${row("Venue",       event && event.venue)}
+        ${row("Booking Ref", "#" + bookingRef)}
+        ${row("Tickets",     String(booking.tickets))}
+        ${row("Payment",     `${booking.paymentMethod.toUpperCase()} — ${booking.paymentStatus.toUpperCase()}`)}
+        ${row("Amount",      formatAmount(booking.amount))}
+      </table>
+
+      ${isCancelled ? `
+      <div style="margin-top:22px;background:#fee2e2;border:1px solid #fecaca;border-radius:10px;padding:14px 18px;">
+        <p style="margin:0;color:#b91c1c;font-size:13px;"><strong>This booking has been cancelled</strong> and is no longer valid for entry.</p>
+      </div>` : ""}
+
+    </div>`);
+}
+
+// verify + display a ticket — PUBLIC (the token in the URL is the credential)
+router.get("/verify/:token", async (req, res) => {
+  try {
+    let payload;
+    try {
+      payload = jwt.verify(req.params.token, process.env.JWT_SECRET);
+    } catch {
+      return res
+        .status(400)
+        .send(renderTicketMessage("Invalid ticket", "This ticket link is invalid or has expired.", "#b91c1c"));
+    }
+
+    if (payload.purpose !== "ticket" || !payload.bookingId) {
+      return res
+        .status(400)
+        .send(renderTicketMessage("Invalid ticket", "This link is not a valid ticket.", "#b91c1c"));
+    }
+
+    const booking = await Booking.findById(payload.bookingId);
+    if (!booking) {
+      return res
+        .status(404)
+        .send(renderTicketMessage("Not found", "We couldn't find this booking.", "#b91c1c"));
+    }
+
+    const [event, user] = await Promise.all([
+      Event.findById(booking.eventId),
+      User.findOne({ email: booking.user }).select("name email phone"),
+    ]);
+
+    res
+      .status(200)
+      .set("Content-Type", "text/html; charset=utf-8")
+      .send(renderTicketPage({ booking, event, user }));
+  } catch (err) {
+    res
+      .status(500)
+      .send(renderTicketMessage("Error", "Something went wrong loading this ticket.", "#b91c1c"));
+  }
+});
 
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 
