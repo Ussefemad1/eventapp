@@ -65,13 +65,14 @@ async function sendBookingConfirmation(booking, event) {
       from:        `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
       to:          booking.user,
       subject:     `Your ticket for ${booking.event} — Booking #${bookingRef}`,
-      attachments: [
-        {
-          filename:    `eventify-ticket-${bookingRef}.png`,
-          content:     qrBase64,
-          contentType: "image/png",
-        },
-      ],
+    attachments: [
+  {
+    filename:    `eventify-ticket-${bookingRef}.png`,
+    content:     qrBase64,
+    contentType: "image/png",
+    contentId:   `qr-${bookingRef}`,   // ← add this; matches src="cid:qr-${bookingRef}"
+  },
+],
       html: `
 <!DOCTYPE html>
 <html lang="en">
