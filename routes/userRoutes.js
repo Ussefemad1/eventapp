@@ -71,9 +71,52 @@ function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+// ─── OTP EMAIL VERIFICATION ───────────────────────────────────────────────────
+const OTP_TTL_MS       = 10 * 60 * 1000; // codes are valid for 10 minutes
+const OTP_MAX_ATTEMPTS = 5;              // wrong tries before a new code is needed
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+}
+
+function hashOtp(otp) {
+  return crypto.createHash("sha256").update(String(otp)).digest("hex");
+}
+
+// generate a fresh code on the user, persist its hash, and email the code
+async function issueOtp(user) {
+  const otp = generateOtp();
+  user.otpHash     = hashOtp(otp);
+  user.otpExpires  = new Date(Date.now() + OTP_TTL_MS);
+  user.otpAttempts = 0;
+  await user.save();
+  await sendOtpEmail(user, otp);
+}
+
+async function sendOtpEmail(user, otp) {
+  await sendBrevoEmail({
+    to:      user.email,
+    subject: `${otp} is your Eventify verification code`,
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:24px;background:#f5f7fa;color:#111;">
+        <div style="max-width:600px;margin:auto;background:#fff;border-radius:14px;padding:32px;border:1px solid #e5e7eb;">
+          <h2 style="margin-top:0;color:#166534;">Verify your email</h2>
+          <p>Hello ${user.name || "there"},</p>
+          <p>Use the code below to verify your Eventify account. It expires in 10 minutes.</p>
+          <div style="margin:28px 0;text-align:center;">
+            <span style="display:inline-block;background:#0d3d22;color:#fff;font-size:34px;font-weight:700;letter-spacing:10px;padding:16px 24px;border-radius:12px;">${otp}</span>
+          </div>
+          <p>If you didn't create an account, you can safely ignore this email.</p>
+          <p style="margin-top:30px;color:#6b7280;font-size:14px;">Eventify Security Team</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 function createAuthResponse(user) {
   const token = jwt.sign(
-    { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name },
+    { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, isVerified: user.isVerified },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -88,6 +131,7 @@ function createAuthResponse(user) {
       gender:         user.gender,
       favoriteEvents: user.favoriteEvents || [],
       isAdmin:        user.isAdmin,
+      isVerified:     user.isVerified,
     },
   };
 }
@@ -102,12 +146,13 @@ function publicUser(user) {
     gender:         user.gender,
     favoriteEvents: user.favoriteEvents || [],
     isAdmin:        user.isAdmin,
+    isVerified:     user.isVerified,
   };
 }
 
 function createTokenForUser(user) {
   return jwt.sign(
-    { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name },
+    { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, isVerified: user.isVerified },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -129,10 +174,72 @@ router.post("/", async (req, res) => {
       gender:  req.body.gender,
       password: req.body.password,
       isAdmin: false,
+      isVerified: false,
     });
 
+    // saves the user (with hashed password + OTP) and emails the code
+    await issueOtp(user);
+
+    res.status(201).json({
+      message: "Account created. We've emailed you a 6-digit verification code.",
+      email: user.email,
+      requiresVerification: true,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// verify the OTP — on success the user is marked verified and logged in (one time only)
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ message: "Email and code are required" });
+
+    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    if (!user) return res.status(400).json({ message: "Invalid code" });
+
+    // already verified — nothing to do, just issue a session
+    if (user.isVerified) return res.json(createAuthResponse(user));
+
+    if (!user.otpHash || !user.otpExpires || user.otpExpires.getTime() < Date.now()) {
+      return res.status(400).json({ message: "Your code has expired. Please request a new one." });
+    }
+    if (user.otpAttempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ message: "Too many attempts. Please request a new code." });
+    }
+
+    if (hashOtp(otp) !== user.otpHash) {
+      user.otpAttempts += 1;
+      await user.save();
+      return res.status(400).json({ message: "Invalid code" });
+    }
+
+    // success — verify once, clear the OTP, and hand back a real session
+    user.isVerified  = true;
+    user.otpHash     = null;
+    user.otpExpires  = null;
+    user.otpAttempts = 0;
     await user.save();
-    res.status(201).json({ message: "User created successfully" });
+
+    res.json(createAuthResponse(user));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// resend a fresh OTP (generic response so accounts can't be enumerated)
+router.post("/resend-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    if (user && !user.isVerified) {
+      await issueOtp(user);
+    }
+
+    res.json({ message: "If that account needs verification, a new code has been sent." });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -148,6 +255,16 @@ router.post("/login", async (req, res) => {
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: "Invalid login" });
+
+    // unverified users can't get a session — send them a fresh code instead
+    if (!user.isVerified) {
+      await issueOtp(user);
+      return res.status(403).json({
+        message: "Please verify your email. We've sent you a new code.",
+        requiresVerification: true,
+        email: user.email,
+      });
+    }
 
     res.json(createAuthResponse(user));
   } catch (err) {

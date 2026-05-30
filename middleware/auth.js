@@ -24,6 +24,7 @@ const auth = (req, res, next) => {
       id: decoded.id,
       email: decoded.email,
       isAdmin: decoded.isAdmin || false,
+      isVerified: decoded.isVerified || false,
     };
 
     next();
