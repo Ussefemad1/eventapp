@@ -1,7 +1,6 @@
 const express = require("express");
 const router  = express.Router();
 const crypto  = require("crypto");
-const { Resend } = require("resend");
 const User    = require("../models/user");
 const Event   = require("../models/event");
 const Booking = require("../models/booking");
@@ -10,17 +9,44 @@ const jwt     = require("jsonwebtoken");
 const auth    = require("../middleware/auth");
 const admin   = require("../middleware/admin");
 
-// ─── RESEND SETUP ─────────────────────────────────────────────────────────────
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+// ─── BREVO EMAIL (HTTPS REST API — works on Railway, no SMTP, no SDK) ──────────
+async function sendBrevoEmail({ to, subject, html }) {
+  if (!process.env.BREVO_API_KEY) {
+    console.warn("BREVO_API_KEY not set — skipping email send.");
+    return;
+  }
+  try {
+    const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method:  "POST",
+      headers: {
+        "accept":       "application/json",
+        "content-type": "application/json",
+        "api-key":      process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: {
+          name:  process.env.SENDER_NAME || "Eventify",
+          email: process.env.SENDER_EMAIL,
+        },
+        to:          [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!resp.ok) {
+      const detail = await resp.text();
+      console.error("Brevo send failed:", resp.status, detail);
+    }
+  } catch (err) {
+    console.error("Brevo send error:", err.message);
+  }
+}
 
 async function sendPasswordChangedEmail(user) {
-  if (!resend) return;
+  if (!process.env.BREVO_API_KEY) return;
 
   try {
-    await resend.emails.send({
-      from: `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
+    await sendBrevoEmail({
       to: user.email,
       subject: "Your Eventify password was changed",
       html: `
@@ -150,8 +176,7 @@ router.post("/forgot-password", async (req, res) => {
 
     const resetURL = `${process.env.CLIENT_URL}/reset-password/reset-password.html?token=${resetToken}`;
 
-    await resend.emails.send({
-      from:    `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
+    await sendBrevoEmail({
       to:      user.email,
       subject: "Reset Your Eventify Password",
       html: `

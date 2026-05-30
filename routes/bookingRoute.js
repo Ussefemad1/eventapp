@@ -6,11 +6,39 @@ const Event   = require("../models/event");
 const auth    = require("../middleware/auth");
 const jwt     = require("jsonwebtoken");
 const User    = require("../models/user");
-const { Resend } = require("resend");
-
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+// Brevo transactional email is sent over its HTTPS REST API (port 443),
+// which works on Railway where outbound SMTP is blocked. No SDK needed.
+async function sendBrevoEmail({ to, subject, html }) {
+  if (!process.env.BREVO_API_KEY) {
+    console.warn("BREVO_API_KEY not set — skipping email send.");
+    return;
+  }
+  try {
+    const resp = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method:  "POST",
+      headers: {
+        "accept":       "application/json",
+        "content-type": "application/json",
+        "api-key":      process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: {
+          name:  process.env.SENDER_NAME || "Eventify",
+          email: process.env.SENDER_EMAIL,
+        },
+        to:          [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!resp.ok) {
+      const detail = await resp.text();
+      console.error("Brevo send failed:", resp.status, detail);
+    }
+  } catch (err) {
+    console.error("Brevo send error:", err.message);
+  }
+}
 
 function canCancelEvent(event) {
   if (!event || !event.startDate) return true;
@@ -35,7 +63,7 @@ function formatAmount(amount) {
 
 // ─── QR CODE BOOKING CONFIRMATION EMAIL ───────────────────────────────────────
 async function sendBookingConfirmation(booking, event) {
-  if (!resend) return;
+  if (!process.env.BREVO_API_KEY) return;
 
   try {
     // The QR encodes a link to a public ticket page. Scanning it opens the page
@@ -49,33 +77,15 @@ async function sendBookingConfirmation(booking, event) {
     const baseUrl   = (process.env.CLIENT_URL || "").replace(/\/+$/, "");
     const ticketUrl = `${baseUrl}/api/bookings/verify/${ticketToken}`;
 
-    // Generate QR code as a base64 data URL (inline PNG, no external hosting needed)
-    const qrDataUrl = await QRCode.toDataURL(ticketUrl, {
-      width:          280,
-      margin:         2,
-      color: {
-        dark:  "#0d3d22",   // dark green dots matching Eventify brand
-        light: "#ffffff",
-      },
-    });
-
-    // Strip the "data:image/png;base64," prefix — Resend needs raw base64
-    const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
+    // The QR image is served by our own /qr/:token endpoint as a normal https
+    // <img> URL, so it renders reliably in every mail client (no inline/CID).
+    const qrImageUrl = `${baseUrl}/api/bookings/qr/${ticketToken}`;
 
     const bookingRef = String(booking._id).slice(-6).toUpperCase();
 
-    await resend.emails.send({
-      from:        `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
-      to:          booking.user,
-      subject:     `Your ticket for ${booking.event} — Booking #${bookingRef}`,
-      attachments: [
-        {
-          filename:    `eventify-ticket-${bookingRef}.png`,
-          content:     qrBase64,
-          contentType: "image/png",
-          contentId:   `qr-${bookingRef}`,
-        },
-      ],
+    await sendBrevoEmail({
+      to:      booking.user,
+      subject: `Your ticket for ${booking.event} — Booking #${bookingRef}`,
       html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -146,7 +156,7 @@ async function sendBookingConfirmation(booking, event) {
 
         <!-- Inline QR code image (attached as PNG, embedded via cid) -->
         <img
-          src="cid:qr-${bookingRef}"
+          src="${qrImageUrl}"
           alt="QR Code for Booking #${bookingRef}"
           width="200"
           height="200"
@@ -186,14 +196,13 @@ async function sendBookingConfirmation(booking, event) {
 
 // ─── BOOKING CANCELLATION EMAIL ───────────────────────────────────────────────
 async function sendCancellationEmail(booking, event) {
-  if (!resend) return;
+  if (!process.env.BREVO_API_KEY) return;
 
   try {
     const bookingRef = String(booking._id).slice(-6).toUpperCase();
     const isRefunded = booking.paymentStatus === "refunded";
 
-    await resend.emails.send({
-      from:    `Eventify <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`,
+    await sendBrevoEmail({
       to:      booking.user,
       subject: `Booking cancelled — ${booking.event} #${bookingRef}`,
       html: `
@@ -425,6 +434,25 @@ router.get("/verify/:token", async (req, res) => {
     res
       .status(500)
       .send(renderTicketMessage("Error", "Something went wrong loading this ticket.", "#b91c1c"));
+  }
+});
+
+// serve the QR PNG for a ticket — PUBLIC (encodes the verify link above)
+router.get("/qr/:token", async (req, res) => {
+  try {
+    jwt.verify(req.params.token, process.env.JWT_SECRET);
+    const baseUrl   = (process.env.CLIENT_URL || "").replace(/\/+$/, "");
+    const ticketUrl = `${baseUrl}/api/bookings/verify/${req.params.token}`;
+    const png = await QRCode.toBuffer(ticketUrl, {
+      width:  280,
+      margin: 2,
+      color:  { dark: "#0d3d22", light: "#ffffff" },
+    });
+    res.set("Content-Type", "image/png");
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(png);
+  } catch {
+    res.status(400).end();
   }
 });
 
