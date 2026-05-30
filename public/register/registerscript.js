@@ -71,7 +71,7 @@ async function register() {
     }
 
     // Account created — a 6-digit code was emailed. Verify it to finish.
-    successMsg.textContent = "Account created! Check your email for a verification code.";
+    successMsg.textContent = data.message || "Account created! Check your email for a verification code.";
     successMsg.style.display = "block";
     openOtpVerification(data.email || email);
 

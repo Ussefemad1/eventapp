@@ -163,8 +163,20 @@ function createTokenForUser(user) {
 // register
 router.post("/", async (req, res) => {
   try {
-    const existingUser = await User.findOne({ email: req.body.email });
-    if (existingUser) return res.status(400).json({ message: "Email already exists" });
+    const existingUser = await User.findOne({ email: String(req.body.email || "").toLowerCase().trim() });
+    if (existingUser) {
+      // Already verified → genuine duplicate.
+      if (existingUser.isVerified) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      // Registered before but never verified → send a fresh code and let them finish.
+      await issueOtp(existingUser);
+      return res.status(200).json({
+        message: "This email is already registered but not verified — we've sent you a new code.",
+        email: existingUser.email,
+        requiresVerification: true,
+      });
+    }
 
     const user = new User({
       name:    req.body.name,
@@ -249,7 +261,7 @@ router.post("/resend-otp", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: String(email || "").toLowerCase().trim() });
 
     if (!user) return res.status(401).json({ message: "Invalid login" });
 
