@@ -449,6 +449,7 @@ router.get("/qr/:token", async (req, res) => {
       color:  { dark: "#0d3d22", light: "#ffffff" },
     });
     res.set("Content-Type", "image/png");
+    res.set("Cross-Origin-Resource-Policy", "cross-origin");
     res.set("Cache-Control", "public, max-age=86400");
     res.send(png);
   } catch {
