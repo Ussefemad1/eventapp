@@ -423,7 +423,9 @@ router.get("/verify/:token", async (req, res) => {
 
     const [event, user] = await Promise.all([
       Event.findById(booking.eventId),
-      User.findOne({ email: booking.user }).select("name email phone"),
+      booking.userId
+        ? User.findById(booking.userId).select("name email phone")
+        : User.findOne({ email: booking.user }).select("name email phone"),
     ]);
 
     res
@@ -462,7 +464,7 @@ router.get("/qr/:token", async (req, res) => {
 // fetch bookings
 router.get("/", auth, async (req, res) => {
   try {
-    const filter = req.user.isAdmin ? {} : { user: req.user.email };
+    const filter = req.user.isAdmin ? {} : { userId: req.user.id };
     const bookings = await Booking.find(filter);
     res.json(bookings);
   } catch (err) {
@@ -477,7 +479,7 @@ router.get("/:id", auth, async (req, res) => {
 
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    if (!req.user.isAdmin && booking.user !== req.user.email) {
+    if (!req.user.isAdmin && booking.userId !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
@@ -516,6 +518,7 @@ router.post("/", auth, async (req, res) => {
     }
 
     const booking = new Booking({
+      userId:        req.user.id,
       user:          req.user.email,
       eventId,
       event:         existingEvent.name,
@@ -548,7 +551,7 @@ router.put("/:id/cancel", auth, async (req, res) => {
 
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    if (!req.user.isAdmin && booking.user !== req.user.email) {
+    if (!req.user.isAdmin && booking.userId !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
@@ -650,7 +653,7 @@ router.delete("/:id", auth, async (req, res) => {
 
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    if (!req.user.isAdmin && booking.user !== req.user.email) {
+    if (!req.user.isAdmin && booking.userId !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 

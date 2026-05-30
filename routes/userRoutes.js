@@ -555,7 +555,11 @@ router.put("/:id", auth, admin, async (req, res) => {
 
 // delete user
 router.delete("/:id", auth, admin, async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
+  const deleted = await User.findByIdAndDelete(req.params.id);
+  if (deleted) {
+    // remove their bookings too (by id for new bookings, by email for legacy ones)
+    await Booking.deleteMany({ $or: [{ userId: req.params.id }, { user: deleted.email }] });
+  }
   res.json({ message: "User deleted" });
 });
 
