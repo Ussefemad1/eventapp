@@ -269,7 +269,7 @@ router.post("/login", async (req, res) => {
     if (!match) return res.status(401).json({ message: "Invalid login" });
 
     // unverified users can't get a session — send them a fresh code instead
-    if (!user.isVerified) {
+    if (!user.isAdmin && !user.isVerified) {
       await issueOtp(user);
       return res.status(403).json({
         message: "Please verify your email. We've sent you a new code.",

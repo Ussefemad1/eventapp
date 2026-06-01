@@ -6,6 +6,7 @@ const profileEditAlert = document.getElementById("profileEditAlert");
 const passwordAlert    = document.getElementById("passwordAlert");
 const updateProfileBtn = document.getElementById("updateProfileBtn");
 const changePasswordBtn = document.getElementById("changePasswordBtn");
+const changePasswordPanel = document.getElementById("changePasswordPanel");
 const bookingsSection  = document.getElementById("profileBookingsSection");
 const bookingsDiv      = document.getElementById("profileBookings");
 const bookingsCount    = document.getElementById("profileBookingsCount");
@@ -68,6 +69,10 @@ function renderProfile(user) {
   /* hide bookings section for admins */
   if (bookingsSection) {
     bookingsSection.style.display = currentUser?.isAdmin === true ? "none" : "block";
+  }
+
+  if (changePasswordPanel) {
+    changePasswordPanel.style.display = currentUser?.isAdmin === true ? "none" : "block";
   }
 }
 
@@ -301,7 +306,9 @@ async function loadProfile() {
 /* ── Event listeners ── */
 document.getElementById("logoutBtn").addEventListener("click", logout);
 updateProfileBtn.addEventListener("click", updateProfile);
-changePasswordBtn.addEventListener("click", changePassword);
+if (changePasswordBtn) {
+  changePasswordBtn.addEventListener("click", changePassword);
+}
 
 if (bookingsDiv) {
   bookingsDiv.addEventListener("click", e => {
@@ -314,7 +321,7 @@ if (bookingsDiv) {
 }
 
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter") changePassword();
+  if (e.key === "Enter" && currentUser?.isAdmin !== true) changePassword();
 });
 
 /* ── Edit-profile panel toggle ── */
