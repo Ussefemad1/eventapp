@@ -10,6 +10,7 @@ const filterCategory = document.getElementById("filterCategory");
 const filterMinPrice = document.getElementById("filterMinPrice");
 const filterMaxPrice = document.getElementById("filterMaxPrice");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+const adminStats = document.getElementById("adminStats");
 
 let currentUser = JSON.parse(localStorage.getItem("currentUser"));
 
@@ -53,6 +54,14 @@ function formatEventDate(value) {
     year: "numeric", month: "short", day: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
+}
+
+function formatStatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString()} EGP`;
 }
 
 function toDateTimeLocalValue(value) {
@@ -311,6 +320,88 @@ function setupEventFilters() {
 /* ── Admin: Create / Edit Event ── */
 let editingEventId = null;
 
+function renderAdminStatsLoading() {
+  if (!adminStats) return;
+  adminStats.innerHTML = `
+    <div class="ev-stat-grid">
+      ${Array.from({ length: 5 }, () => `
+        <div class="ev-stat-card">
+          <div class="ev-skeleton" style="width:58px;height:15px;border-radius:6px;margin-bottom:16px;"></div>
+          <div class="ev-skeleton" style="width:92px;height:30px;border-radius:8px;margin-bottom:10px;"></div>
+          <div class="ev-skeleton" style="width:130px;height:14px;border-radius:6px;"></div>
+        </div>
+      `).join("")}
+    </div>`;
+}
+
+function renderAdminStatsError(message) {
+  if (!adminStats) return;
+  adminStats.innerHTML = `
+    <div class="ev-admin-stats-error">
+      <strong>Stats unavailable</strong>
+      <span>${escapeHtml(message || "Could not load admin stats.")}</span>
+    </div>`;
+}
+
+function renderAdminStats(data) {
+  if (!adminStats) return;
+
+  const stats = [
+    { label: "Revenue", value: formatMoney(data.revenue), note: "Paid active bookings" },
+    { label: "Users", value: formatStatNumber(data.totalUsers), note: "Registered accounts" },
+    { label: "Events", value: formatStatNumber(data.totalEvents), note: `${formatStatNumber(data.upcomingEvents)} upcoming` },
+    { label: "Bookings", value: formatStatNumber(data.totalBookings), note: `${formatStatNumber(data.activeBookings)} active` },
+    { label: "Cash Pending", value: formatStatNumber(data.pendingCashPayments), note: "Awaiting in-store payment" },
+  ];
+
+  const lowSeatEvents = Array.isArray(data.lowSeatEvents) ? data.lowSeatEvents : [];
+  const lowSeatHtml = lowSeatEvents.length
+    ? lowSeatEvents.map(event => `
+        <li>
+          <div>
+            <strong>${escapeHtml(event.name || "Untitled Event")}</strong>
+            <span>${escapeHtml(event.venue || "Venue TBA")}</span>
+          </div>
+          <em>${formatStatNumber(event.available)} / ${formatStatNumber(event.seats)} left</em>
+        </li>
+      `).join("")
+    : `<li class="ev-low-seat-empty">No low-seat events right now.</li>`;
+
+  adminStats.innerHTML = `
+    <div class="ev-stat-grid">
+      ${stats.map(stat => `
+        <article class="ev-stat-card">
+          <span>${escapeHtml(stat.label)}</span>
+          <strong>${escapeHtml(stat.value)}</strong>
+          <small>${escapeHtml(stat.note)}</small>
+        </article>
+      `).join("")}
+    </div>
+    <article class="ev-low-seat-panel">
+      <div class="ev-low-seat-head">
+        <div>
+          <span>Attention</span>
+          <h3>Low Seat Events</h3>
+        </div>
+        <strong>${formatStatNumber(lowSeatEvents.length)}</strong>
+      </div>
+      <ul>${lowSeatHtml}</ul>
+    </article>`;
+}
+
+async function loadAdminStats() {
+  if (!adminStats || currentUser?.isAdmin !== true) return;
+
+  renderAdminStatsLoading();
+
+  try {
+    const stats = await apiFetch("/admin/stats");
+    renderAdminStats(stats);
+  } catch (e) {
+    renderAdminStatsError(e.message);
+  }
+}
+
 function resetEventForm() {
   const ename      = document.getElementById("ename");
   const ecat       = document.getElementById("ecat");
@@ -423,6 +514,7 @@ async function addEvent() {
     resetEventForm();
     showAdminMsg(message, "success");
     renderEvents();
+    loadAdminStats();
   } catch (e) {
     showAdminMsg("Could not save event: " + e.message, "error");
   } finally {
@@ -495,6 +587,7 @@ async function deleteEvent(id) {
       await apiFetch("/bookings/" + b._id, { method: "DELETE" });
     }
     renderEvents();
+    loadAdminStats();
   } catch (e) {
     console.error("Delete error:", e.message);
   }
@@ -637,6 +730,7 @@ function updateUI() {
     profileBtn.style.display  = "inline-block";
     logoutBtn.style.display   = "inline-flex";
     adminPanel.style.display  = isAdmin ? "block" : "none";
+    if (isAdmin) loadAdminStats();
   } else {
     userInfo.innerHTML        = "Browse upcoming events or login to book your tickets.";
     logoutBtn.style.display   = "none";
